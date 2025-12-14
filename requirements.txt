@@ -2,7 +2,7 @@ streamlit
 tensorflow-cpu==2.15.0
 numpy<2.0
 opencv-python-headless
-streamlit-drawable-canvas==0.9.3
 protobuf==3.20.3
 googletrans==4.0.0-rc1
 pandas
+
