@@ -6,7 +6,7 @@ import cv2
 from PIL import Image
 import math
 import pandas as pd
-from deep_translator import GoogleTranslator
+from googletrans import Translator
 
 # --- 1. 定数と初期設定 ---
 
@@ -41,7 +41,16 @@ def get_gradcam_data(model, input_img_array):
     heatmap_np = heatmap.numpy()
 
     decoded = decode_predictions(model.predict(input_img_array), top=1)[0][0]
-    prediction_label = f"{decoded[1]} ({decoded[2]*100:.1f}%)"
+    en_label = decoded[1]
+
+    try:
+        translator = Translator()
+        # src='en' (英語) から dest='ja' (日本語) へ
+        ja_label = translator.translate(en_label, src='en', dest='ja').text
+    except:
+        ja_label = en_label # エラー時は英語のまま
+
+    prediction_label = f"{ja_label} ({en_label}) {decoded[2]*100:.1f}%"
 
     # ヒートマップ最大値の座標取得
     result_coords = np.unravel_index(np.argmax(heatmap_np), heatmap_np.shape)
