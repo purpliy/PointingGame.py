@@ -1,7 +1,5 @@
 streamlit
-tensorflow==2.15.0
+tensorflow
 numpy<2.0
 opencv-python-headless
-pillow
-streamlit-drawable-canvas==0.9.3
-protobuf==3.20.3
+streamlit-drawable-canvas
