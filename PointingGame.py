@@ -5,6 +5,7 @@ import numpy as np
 import cv2
 from PIL import Image
 import math
+import pandas as pd
 
 # --- 1. 定数と初期設定 ---
 
@@ -149,6 +150,26 @@ def main():
         result_img = generate_result_image(st.session_state.original_img, st.session_state.heatmap, 
                                            st.session_state.user_point, st.session_state.true_point)
         st.image(result_img, caption="青:あなた / 赤:AI正解", width=350)
+        
+        #resultをCSVに変換
+        result_data = {
+            "prediction": [st.session_state.label],
+            "score": [st.session_state.score],
+            "error_px": [st.session_state.dist],
+            "user_x": [st.session_state.user_point[0]],
+            "user_y": [st.session_state.user_point[1]],
+            "ai_x": [st.session_state.true_point[0]],
+            "ai_y": [st.session_state.true_point[1]],
+        }
+        df = pd.DataFrame(result_data)
+        csv = df.to_csv(index=False).encode('utf-8')
+
+        st.download_button(
+            label="💾 結果をCSVで保存する",
+            data=csv,
+            file_name='gradcam_result.csv',
+            mime='text/csv',
+        )
         
         if st.button("次の画像へ"):
             st.session_state.game_state = 'upload'
