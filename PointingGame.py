@@ -209,6 +209,7 @@ def main():
             "user_y": [st.session_state.user_point[1]],
             "ai_x": [st.session_state.true_point[0]],
             "ai_y": [st.session_state.true_point[1]],
+            'intensity': [st.session_state.intensity]
         }
         df = pd.DataFrame(result_data)
         csv = df.to_csv(index=False).encode('utf-8')
