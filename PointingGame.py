@@ -220,56 +220,60 @@ def main():
 
         st.markdown("---")
         st.subheader("📝 実験アンケート")
+        st.info("以下のアンケートに回答し、**「回答を確定」**ボタンを押してください。")
 
-        q_difficulty = st.select_slider(
-            "Q1. AIの注目箇所を予想するのは難しかったですか？",
-            options=["とても簡単", "簡単", "普通", "難しい", "とても難しい"],
-            value="普通"
-        )
+        with st.form("survey_form"):
+            q_difficulty = st.select_slider(
+                "Q1. AIの注目箇所を予想するのは難しかったですか？",
+                options=["とても簡単", "簡単", "普通", "難しい", "とても難しい"],
+                value="普通"
+            )
 
-        q_agree = st.radio(
-            "Q2. 正解（赤点や赤い領域）を見て、AIの判断に納得できましたか？",
-            ["はい、納得できる", "いいえ、納得できない（AIが変だと思う）"],
-            index=0
-        )
+            q_agree = st.radio(
+                "Q2. 正解（赤点や赤い領域）を見て、AIの判断に納得できましたか？",
+                ["はい、納得できる", "いいえ、納得できない（AIが変だと思う）"],
+                index=0
+            )
 
-        q_comment = st.text_area(
-            "Q3. 自由記述（AIはどこを見ていたと思いますか？）",
-            placeholder="例：背景に反応していた"
-        )
+            q_comment = st.text_area(
+                "Q3. 自由記述（AIはどこを見ていたと思いますか？）",
+                placeholder="例：背景に反応していた"
+            )
+
+            submitted = st.form_submit_button("回答を確定してダウンロードボタンを表示")
+
+        if submitted:
+            result_data = {
+                "user_name": [user_name],
+                "ai_knowledge": [ai_knowledge],
+                "image_file": [st.session_state.image_filename],
+                "prediction_label": [st.session_state.label],
+                "ai_confidence": [st.session_state.confidence],
+                "response_time": [st.session_state.response_time],
+                "score": [st.session_state.score],
+                "intensity": [st.session_state.intensity], # AI一致度
+                "error_px": [st.session_state.dist],       # 距離誤差
+                "user_x": [st.session_state.user_point[0]],
+                "user_y": [st.session_state.user_point[1]],
+                "ai_x": [st.session_state.true_point[0]],
+                "ai_y": [st.session_state.true_point[1]],
+                "survey_difficulty": [q_difficulty],
+                "survey_agree": [q_agree],
+                "survey_comment": [q_comment]
+            }
+            df = pd.DataFrame(result_data)
+            
+            csv_filename = f"{user_name}_{st.session_state.image_filename}_result.csv"
+            csv = df.to_csv(index=False).encode('utf-8')
+
+            st.download_button(
+                label="💾 全データをCSVで保存",
+                data=csv,
+                file_name=csv_filename,
+                mime='text/csv',
+            )
 
         st.markdown("---")
-        
-        result_data = {
-            "user_name": [user_name],
-            "ai_knowledge": [ai_knowledge],
-            "image_file": [st.session_state.image_filename],
-            "prediction_label": [st.session_state.label],
-            "ai_confidence": [st.session_state.confidence],
-            "response_time": [st.session_state.response_time],
-            "score": [st.session_state.score],
-            "intensity": [st.session_state.intensity], # AI一致度
-            "error_px": [st.session_state.dist],       # 距離誤差
-            "user_x": [st.session_state.user_point[0]],
-            "user_y": [st.session_state.user_point[1]],
-            "ai_x": [st.session_state.true_point[0]],
-            "ai_y": [st.session_state.true_point[1]],
-            "survey_difficulty": [q_difficulty],
-            "survey_agree": [q_agree],
-            "survey_comment": [q_comment]
-        }
-        df = pd.DataFrame(result_data)
-        
-        csv_filename = f"{user_name}_{st.session_state.image_filename}_result.csv"
-        csv = df.to_csv(index=False).encode('utf-8')
-
-        st.download_button(
-            label="💾 全データをCSVで保存",
-            data=csv,
-            file_name=csv_filename,
-            mime='text/csv',
-        )
-        
         if st.button("次の画像へ (ランダム)"):
             st.session_state.game_state = 'init'
             st.rerun()
