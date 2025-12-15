@@ -65,15 +65,13 @@ def get_gradcam_data(model, input_img_array):
 
     return heatmap_np, prediction_label, confidence, true_point
 
-# --- 👇 復活させた「距離計算」関数 ---
 def calculate_score(user_point, true_point):
-    """距離を計算するだけの関数（スコアには使わないが分析用に保存）"""
+    """距離を計算する関数"""
     dist = math.sqrt((user_point[0] - true_point[0])**2 + (user_point[1] - true_point[1])**2)
     return dist
 
-# --- 👇 新しい「ヒートマップ強度」計算関数 ---
 def calculate_score_by_heatmap(user_point, heatmap_np):
-    """ユーザーがクリックした座標のヒートマップ強度(0.0~1.0)をスコアにする"""
+    """ヒートマップ強度からスコア計算"""
     h, w = heatmap_np.shape
     grid_x = int(user_point[0] / IMG_SIZE[0] * w)
     grid_y = int(user_point[1] / IMG_SIZE[1] * h)
@@ -126,8 +124,13 @@ def main():
             ("全く知らない", "聞いたことはある", "仕組みを少し知っている", "研究・開発経験がある"),
             index=1
         )
+        
         st.write("---")
-        st.write("※入力すると実験を開始できます")
+        # リセットボタン
+        if st.button("実験をリセット (最初から)"):
+            for key in st.session_state.keys():
+                del st.session_state[key]
+            st.rerun()
 
     if not user_name:
         st.warning("👈 左のサイドバーでお名前を入力してください。")
@@ -137,24 +140,46 @@ def main():
         st.session_state.model = load_model()
     
     if 'game_state' not in st.session_state:
-        st.session_state.game_state = 'init'
+        st.session_state.game_state = 'setup' # 初期状態を setup に変更
 
-    # --- INIT ---
-    if st.session_state.game_state == 'init':
+    # --- SETUP: 画像リストを作成してシャッフル ---
+    if st.session_state.game_state == 'setup':
         if not os.path.exists(IMAGE_FOLDER):
             st.error(f"エラー: '{IMAGE_FOLDER}' フォルダが見つかりません。")
             st.stop()
         
+        # 画像ファイルを読み込み
         image_files = [f for f in os.listdir(IMAGE_FOLDER) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
         
         if not image_files:
             st.error(f"エラー: '{IMAGE_FOLDER}' フォルダに画像が入っていません。")
             st.stop()
+            
+        # シャッフルして保存（これが山札になります）
+        random.shuffle(image_files)
+        st.session_state.image_queue = image_files
+        st.session_state.total_images = len(image_files)
+        
+        # ゲーム開始へ
+        st.session_state.game_state = 'init'
+        st.rerun()
 
-        selected_file = random.choice(image_files)
+    # --- INIT: 山札から1枚引く ---
+    if st.session_state.game_state == 'init':
+        # 山札が空になったら終了画面へ
+        if not st.session_state.image_queue:
+            st.session_state.game_state = 'finished'
+            st.rerun()
+            return
+
+        # 山札から1枚引く (.pop() はリストから削除して取得する)
+        selected_file = st.session_state.image_queue.pop()
         image_path = os.path.join(IMAGE_FOLDER, selected_file)
+        
+        # 残り枚数計算
+        current_count = st.session_state.total_images - len(st.session_state.image_queue)
 
-        with st.spinner(f'画像を読み込み中...'):
+        with st.spinner(f'画像を読み込み中... ({current_count}/{st.session_state.total_images}枚目)'):
             img = Image.open(image_path).convert("RGB")
             img_array = preprocess_input(np.expand_dims(np.array(img.resize(IMG_SIZE)), axis=0).astype(np.float32))
             
@@ -167,6 +192,7 @@ def main():
                 'label': label,
                 'confidence': confidence,
                 'image_filename': selected_file,
+                'current_count': current_count, # 今何枚目か
                 'start_time': time.time(),
                 'game_state': 'playing'
             })
@@ -174,7 +200,7 @@ def main():
 
     # --- PLAYING ---
     elif st.session_state.game_state == 'playing':
-        st.info(f"被験者: **{user_name}** | 画像: {st.session_state.image_filename}")
+        st.info(f"被験者: **{user_name}** | 画像: {st.session_state.current_count} / {st.session_state.total_images} 枚目")
         st.success(f"AI予測: **{st.session_state.label}** (確信度: {st.session_state.confidence*100:.1f}%)")
         st.write("スライダーを動かして、AIが注目した場所に**照準(青)**を合わせてください！")
         
@@ -192,18 +218,14 @@ def main():
             response_time = end_time - st.session_state.start_time
             
             user_pt = (user_x, user_y)
-            
-            # 👇 距離も計算する (分析用)
             dist = calculate_score(user_pt, st.session_state.true_point)
-            
-            # 👇 スコアはヒートマップ強度で決める
             score, intensity = calculate_score_by_heatmap(user_pt, st.session_state.heatmap)
             
             st.session_state.update({
                 'user_point': user_pt, 
                 'score': score, 
                 'dist': dist, 
-                'intensity': intensity, # ヒートマップ強度も保存
+                'intensity': intensity,
                 'response_time': response_time,
                 'game_state': 'result'
             })
@@ -239,7 +261,7 @@ def main():
                 "Q3. 自由記述（AIはどこを見ていたと思いますか？）",
                 placeholder="例：背景に反応していた"
             )
-
+            
             submitted = st.form_submit_button("回答を確定してダウンロードボタンを表示")
 
         if submitted:
@@ -251,8 +273,8 @@ def main():
                 "ai_confidence": [st.session_state.confidence],
                 "response_time": [st.session_state.response_time],
                 "score": [st.session_state.score],
-                "intensity": [st.session_state.intensity], # AI一致度
-                "error_px": [st.session_state.dist],       # 距離誤差
+                "intensity": [st.session_state.intensity],
+                "error_px": [st.session_state.dist],
                 "user_x": [st.session_state.user_point[0]],
                 "user_y": [st.session_state.user_point[1]],
                 "ai_x": [st.session_state.true_point[0]],
@@ -266,17 +288,34 @@ def main():
             csv_filename = f"{user_name}_{st.session_state.image_filename}_result.csv"
             csv = df.to_csv(index=False).encode('utf-8')
 
+            st.success("回答を受け付けました！")
             st.download_button(
-                label="💾 全データをCSVで保存",
+                label="💾 CSVで保存",
                 data=csv,
                 file_name=csv_filename,
                 mime='text/csv',
             )
-
+        
         st.markdown("---")
-        if st.button("次の画像へ (ランダム)"):
+        # 次のボタンの表示ロジック
+        if st.session_state.image_queue:
+            next_label = "次の画像へ進む"
+        else:
+            next_label = "結果画面へ進む（画像終了）"
+
+        if st.button(next_label):
             st.session_state.game_state = 'init'
             st.rerun()
+
+    # --- FINISHED: 全画像終了 ---
+    elif st.session_state.game_state == 'finished':
+        st.balloons()
+        st.title("🎉 実験終了です！")
+        st.success("すべての画像の回答が終わりました。ご協力ありがとうございました。")
+        st.write(f"被験者名: {user_name}")
+        
+        st.markdown("---")
+        st.info("ブラウザを閉じて終了するか、別の被験者で開始する場合はサイドバーの「実験をリセット」を押してください。")
 
 if __name__ == "__main__":
     main()
