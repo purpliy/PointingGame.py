@@ -69,6 +69,32 @@ def calculate_score(user_point, true_point):
     score = max(0, 100 - (dist / max_dist * 300)) # 難易度調整
     return int(score), dist
 
+def calculate_score_by_heatmap(user_point, heatmap_np):
+    """
+    ユーザーがクリックした座標のヒートマップ強度(0.0~1.0)をスコアにする
+    """
+    # 224x224 の座標を、7x7 (heatmapのサイズ) の座標に変換
+    # heatmap_np.shape は (7, 7) など小さいサイズなので注意
+    
+    h, w = heatmap_np.shape
+    
+    # ユーザー座標 (0~224) を ヒートマップ座標 (0~7) にマッピング
+    # int() で切り捨てるとズレるので、比率で計算
+    grid_x = int(user_point[0] / IMG_SIZE[0] * w)
+    grid_y = int(user_point[1] / IMG_SIZE[1] * h)
+    
+    # 配列外参照を防ぐクリッピング
+    grid_x = min(max(grid_x, 0), w - 1)
+    grid_y = min(max(grid_y, 0), h - 1)
+    
+    # その場所の熱さを取得 (0.0 ~ 1.0)
+    intensity = heatmap_np[grid_y, grid_x]
+    
+    # スコア化 (100点満点)
+    score = int(intensity * 100)
+    
+    return score, intensity
+
 def draw_crosshair(img_pil, x, y, color=(0, 0, 255)):
     """画像上に照準（十字）を描画する"""
     img_cv = np.array(img_pil.resize(IMG_SIZE))
@@ -147,11 +173,24 @@ def main():
         preview_img = draw_crosshair(st.session_state.original_img, user_x, user_y, color=(0, 0, 255))
         st.image(preview_img, caption="現在の狙い", width=300)
         
-        if st.button("ここに決定！"):
-            user_pt = (user_x, user_y)
-            score, dist = calculate_score(user_pt, st.session_state.true_point)
-            st.session_state.update({'user_point': user_pt, 'score': score, 'dist': dist, 'game_state': 'result'})
-            st.rerun()
+    if st.button("決定する"):
+        # 距離計算（参考値として残す）
+        _, dist = calculate_score(user_point, st.session_state.true_point) # 以前の関数も残しておく
+        
+        # 👇 新しいスコア計算 (ヒートマップの熱さを見る)
+        score, intensity = calculate_score_by_heatmap(user_point, st.session_state.heatmap)
+        
+        user_pt = (user_x, user_y)
+        
+        st.session_state.update({
+            'user_point': user_pt, 
+            'score': score,      # ここが熱さベースのスコアになる
+            'dist': dist,        # 距離もデータとして保存しておくと比較できて面白い
+            'intensity': intensity, # 熱さ(0.0-1.0)も保存
+            'response_time': response_time,
+            'game_state': 'result'
+        })
+        st.rerun()
 
     # RESULT
     elif st.session_state.game_state == 'result':
