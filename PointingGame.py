@@ -124,9 +124,7 @@ def main():
             ("全く知らない", "聞いたことはある", "仕組みを少し知っている", "研究・開発経験がある"),
             index=1
         )
-        
         st.write("---")
-        # リセットボタン
         if st.button("実験をリセット (最初から)"):
             for key in st.session_state.keys():
                 del st.session_state[key]
@@ -139,8 +137,12 @@ def main():
     if 'model' not in st.session_state:
         st.session_state.model = load_model()
     
+    # 全データ保存用のリストを初期化
+    if 'all_results' not in st.session_state:
+        st.session_state.all_results = []
+
     if 'game_state' not in st.session_state:
-        st.session_state.game_state = 'setup' # 初期状態を setup に変更
+        st.session_state.game_state = 'setup'
 
     # --- SETUP: 画像リストを作成してシャッフル ---
     if st.session_state.game_state == 'setup':
@@ -148,35 +150,29 @@ def main():
             st.error(f"エラー: '{IMAGE_FOLDER}' フォルダが見つかりません。")
             st.stop()
         
-        # 画像ファイルを読み込み
         image_files = [f for f in os.listdir(IMAGE_FOLDER) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
         
         if not image_files:
             st.error(f"エラー: '{IMAGE_FOLDER}' フォルダに画像が入っていません。")
             st.stop()
             
-        # シャッフルして保存（これが山札になります）
         random.shuffle(image_files)
         st.session_state.image_queue = image_files
         st.session_state.total_images = len(image_files)
+        st.session_state.all_results = [] # リセット時にデータも空にする
         
-        # ゲーム開始へ
         st.session_state.game_state = 'init'
         st.rerun()
 
     # --- INIT: 山札から1枚引く ---
     if st.session_state.game_state == 'init':
-        # 山札が空になったら終了画面へ
         if not st.session_state.image_queue:
             st.session_state.game_state = 'finished'
             st.rerun()
             return
 
-        # 山札から1枚引く (.pop() はリストから削除して取得する)
         selected_file = st.session_state.image_queue.pop()
         image_path = os.path.join(IMAGE_FOLDER, selected_file)
-        
-        # 残り枚数計算
         current_count = st.session_state.total_images - len(st.session_state.image_queue)
 
         with st.spinner(f'画像を読み込み中... ({current_count}/{st.session_state.total_images}枚目)'):
@@ -192,7 +188,7 @@ def main():
                 'label': label,
                 'confidence': confidence,
                 'image_filename': selected_file,
-                'current_count': current_count, # 今何枚目か
+                'current_count': current_count,
                 'start_time': time.time(),
                 'game_state': 'playing'
             })
@@ -262,61 +258,60 @@ def main():
                 placeholder="例：背景に反応していた"
             )
             
-            submitted = st.form_submit_button("回答を確定してダウンロードボタンを表示")
+            submitted = st.form_submit_button("回答を確定して次へ進む")
 
         if submitted:
-            result_data = {
-                "user_name": [user_name],
-                "ai_knowledge": [ai_knowledge],
-                "image_file": [st.session_state.image_filename],
-                "prediction_label": [st.session_state.label],
-                "ai_confidence": [st.session_state.confidence],
-                "response_time": [st.session_state.response_time],
-                "score": [st.session_state.score],
-                "intensity": [st.session_state.intensity],
-                "error_px": [st.session_state.dist],
-                "user_x": [st.session_state.user_point[0]],
-                "user_y": [st.session_state.user_point[1]],
-                "ai_x": [st.session_state.true_point[0]],
-                "ai_y": [st.session_state.true_point[1]],
-                "survey_difficulty": [q_difficulty],
-                "survey_agree": [q_agree],
-                "survey_comment": [q_comment]
+            # 1枚分のデータを辞書にする
+            current_data = {
+                "user_name": user_name,
+                "ai_knowledge": ai_knowledge,
+                "image_file": st.session_state.image_filename,
+                "prediction_label": st.session_state.label,
+                "ai_confidence": st.session_state.confidence,
+                "response_time": st.session_state.response_time,
+                "score": st.session_state.score,
+                "intensity": st.session_state.intensity,
+                "error_px": st.session_state.dist,
+                "user_x": st.session_state.user_point[0],
+                "user_y": st.session_state.user_point[1],
+                "ai_x": st.session_state.true_point[0],
+                "ai_y": st.session_state.true_point[1],
+                "survey_difficulty": q_difficulty,
+                "survey_agree": q_agree,
+                "survey_comment": q_comment
             }
-            df = pd.DataFrame(result_data)
             
-            csv_filename = f"{user_name}_{st.session_state.image_filename}_result.csv"
-            csv = df.to_csv(index=False).encode('utf-8')
-
-            st.success("回答を受け付けました！")
-            st.download_button(
-                label="💾 CSVで保存",
-                data=csv,
-                file_name=csv_filename,
-                mime='text/csv',
-            )
-        
-        st.markdown("---")
-        # 次のボタンの表示ロジック
-        if st.session_state.image_queue:
-            next_label = "次の画像へ進む"
-        else:
-            next_label = "結果画面へ進む（画像終了）"
-
-        if st.button(next_label):
+            # 全体データリストに追加
+            st.session_state.all_results.append(current_data)
+            
+            # 次の画像へ（山札チェックに戻る）
             st.session_state.game_state = 'init'
             st.rerun()
 
     # --- FINISHED: 全画像終了 ---
     elif st.session_state.game_state == 'finished':
-        
+        st.balloons()
         st.title("🎉 実験終了です！")
-        st.success("すべての画像の回答が終わりました。ご協力ありがとうございました。")
+        st.success("すべての画像の回答が終わりました。以下のボタンからデータを保存し、実験者に送付してください。")
         st.write(f"被験者名: {user_name}")
+        st.write(f"回答した枚数: {len(st.session_state.all_results)}枚")
+        
+        # 全データをDataFrameに変換
+        if st.session_state.all_results:
+            df = pd.DataFrame(st.session_state.all_results)
+            csv = df.to_csv(index=False).encode('utf-8')
+            csv_filename = f"{user_name}_FULL_EXPERIMENT.csv"
+
+            st.download_button(
+                label="💾 実験データをまとめてダウンロード (CSV)",
+                data=csv,
+                file_name=csv_filename,
+                mime='text/csv',
+                type='primary' # 目立つ色にする
+            )
         
         st.markdown("---")
-        st.info("ブラウザを閉じて終了するか、別の被験者で開始する場合はサイドバーの「実験をリセット」を押してください。")
+        st.info("別の被験者で開始する場合は、サイドバーの「実験をリセット」を押してください。")
 
 if __name__ == "__main__":
-
     main()
