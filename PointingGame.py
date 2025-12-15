@@ -174,7 +174,7 @@ def main():
 
     # --- PLAYING ---
     elif st.session_state.game_state == 'playing':
-        st.info(f"被験者: **{st.session_state.user_name}** | 画像: {st.session_state.image_filename}")
+        st.info(f"被験者: **{user_name}** | 画像: {st.session_state.image_filename}")
         st.success(f"AI予測: **{st.session_state.label}** (確信度: {st.session_state.confidence*100:.1f}%)")
         st.write("スライダーを動かして、AIが注目した場所に**照準(青)**を合わせてください！")
         
@@ -241,7 +241,7 @@ def main():
         st.markdown("---")
         
         result_data = {
-            "user_name": [st.session_state.user_name],
+            "user_name": [user_name],
             "ai_knowledge": [ai_knowledge],
             "image_file": [st.session_state.image_filename],
             "prediction_label": [st.session_state.label],
@@ -260,7 +260,7 @@ def main():
         }
         df = pd.DataFrame(result_data)
         
-        csv_filename = f"{st.session_state.user_name}_{st.session_state.image_filename}_result.csv"
+        csv_filename = f"{user_name}_{st.session_state.image_filename}_result.csv"
         csv = df.to_csv(index=False).encode('utf-8')
 
         st.download_button(
