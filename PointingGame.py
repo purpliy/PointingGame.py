@@ -10,6 +10,7 @@ from googletrans import Translator
 import os
 import random
 import time
+from streamlit_image_coordinates import streamlit_image_coordinates
 
 # --- 1. 定数と初期設定 ---
 
@@ -182,6 +183,7 @@ def main():
             heatmap, label, confidence, true_pt = get_gradcam_data(st.session_state.model, img_array)
             
             st.session_state.update({
+                'temp_click': None,
                 'original_img': img, 
                 'heatmap': heatmap, 
                 'true_point': true_pt,
@@ -194,38 +196,54 @@ def main():
             })
             st.rerun()
 
-    # --- PLAYING ---
+# --- PLAYING (クリック式に変更) ---
     elif st.session_state.game_state == 'playing':
         st.info(f"被験者: **{user_name}** | 画像: {st.session_state.current_count} / {st.session_state.total_images} 枚目")
         st.success(f"AI予測: **{st.session_state.label}** (確信度: {st.session_state.confidence*100:.1f}%)")
-        st.write("スライダーを動かして、AIが注目した場所に**照準(青)**を合わせてください！")
+        st.write("画像をクリックして、AIの注目箇所を指定してください。")
         
-        col1, col2 = st.columns(2)
-        with col1:
-            user_x = st.slider("横位置 (X)", 0, IMG_SIZE[0]-1, 112)
-        with col2:
-            user_y = st.slider("縦位置 (Y)", 0, IMG_SIZE[1]-1, 112)
+        # 1. 表示する画像を決定 (クリック済なら照準付き、未クリックなら原画)
+        if st.session_state.temp_click is None:
+            display_img = st.session_state.original_img.resize(IMG_SIZE)
+            caption = "ここをクリックして選択"
+        else:
+            display_img = draw_crosshair(st.session_state.original_img, 
+                                        st.session_state.temp_click[0], 
+                                        st.session_state.temp_click[1], 
+                                        color=(0, 0, 255))
+            caption = "👇 場所が決まったら下の「決定する」ボタンを押してください"
 
-        preview_img = draw_crosshair(st.session_state.original_img, user_x, user_y, color=(0, 0, 255))
-        st.image(preview_img, caption="現在の狙い", width=300)
-        
-        if st.button("決定する"):
-            end_time = time.time()
-            response_time = end_time - st.session_state.start_time
-            
-            user_pt = (user_x, user_y)
-            dist = calculate_score(user_pt, st.session_state.true_point)
-            score, intensity = calculate_score_by_heatmap(user_pt, st.session_state.heatmap)
-            
-            st.session_state.update({
-                'user_point': user_pt, 
-                'score': score, 
-                'dist': dist, 
-                'intensity': intensity,
-                'response_time': response_time,
-                'game_state': 'result'
-            })
-            st.rerun()
+        # 2. クリック可能な画像を表示
+        value = streamlit_image_coordinates(display_img, key="click", width=IMG_SIZE[0], height=IMG_SIZE[1])
+
+        # 3. クリックされたら座標を保存して再描画
+        if value is not None:
+            new_point = (value['x'], value['y'])
+            # 座標が更新された場合のみリラン
+            if st.session_state.temp_click != new_point:
+                st.session_state.temp_click = new_point
+                st.rerun()
+
+        # 4. 決定ボタン (クリック済みの場合のみ有効化)
+        if st.session_state.temp_click is not None:
+            st.write(f"選択座標: {st.session_state.temp_click}")
+            if st.button("決定する", type="primary"):
+                end_time = time.time()
+                response_time = end_time - st.session_state.start_time
+                
+                user_pt = st.session_state.temp_click
+                dist = calculate_score(user_pt, st.session_state.true_point)
+                score, intensity = calculate_score_by_heatmap(user_pt, st.session_state.heatmap)
+                
+                st.session_state.update({
+                    'user_point': user_pt, 
+                    'score': score, 
+                    'dist': dist, 
+                    'intensity': intensity,
+                    'response_time': response_time,
+                    'game_state': 'result'
+                })
+                st.rerun()
 
     # --- RESULT ---
     elif st.session_state.game_state == 'result':
@@ -290,7 +308,7 @@ def main():
 
     # --- FINISHED: 全画像終了 ---
     elif st.session_state.game_state == 'finished':
-        
+        st.balloons()
         st.title("🎉 実験終了です！")
         st.success("すべての画像の回答が終わりました。以下のボタンからデータを保存し、実験者に送付してください。")
         st.write(f"被験者名: {user_name}")
@@ -314,5 +332,4 @@ def main():
         st.info("別の被験者で開始する場合は、サイドバーの「実験をリセット」を押してください。")
 
 if __name__ == "__main__":
-
     main()
