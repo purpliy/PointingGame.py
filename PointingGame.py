@@ -151,11 +151,16 @@ def main():
         st.info("実験を始める前に、以下の情報を入力してください。")
 
         with st.form("entry_form"):
-            input_name = st.text_input("お名前 (または学籍番号)", placeholder="例: 山田太郎")
+            input_name = st.text_input("ニックネーム(本名である必要はありません)")
             
             input_knowledge = st.radio(
                 "Q. AI(人工知能)についての知識はありますか？",
-                ("全く知らない", "聞いたことはある", "仕組みを少し知っている", "研究・開発経験がある"),
+                (
+                    "全く知らない/使ったことがない", 
+                    "ChatGPTやGeminiなどの生成AIを使ったことがある", 
+                    "AIの仕組み(機械学習の原理など)をある程度理解している", 
+                    "AIの研究・開発経験がある"
+                 ),
                 index=1
             )
             
@@ -320,8 +325,51 @@ def main():
 
     # --- FINISHED ---
     elif st.session_state.game_state == 'finished':
-        st.balloons()
+        
         st.title("🎉 全画像終了です！")
+
+        if st.session_state.all_results:
+            # スコアのリストを取り出す
+            scores = [res['score'] for res in st.session_state.all_results]
+            total_score = sum(scores)
+            avg_score = total_score / len(scores) if scores else 0
+            
+            # ランク判定ロジック (基準は調整してください)
+            if avg_score >= 90:
+                rank = "S"
+                title = "👑 AIマスター"
+                comment = "すごい！AIの思考をほぼ完璧に読み切っています！"
+                color = "green"
+            elif avg_score >= 80:
+                rank = "A"
+                title = "🤖 AIエキスパート"
+                comment = "かなりAIと気が合いますね。素晴らしい感覚です。"
+                color = "blue"
+            elif avg_score >= 70:
+                rank = "B"
+                title = "👀 AIチャレンジャー"
+                comment = "標準的なスコアです。AIの癖が少しわかってきたかも？"
+                color = "orange"
+            else:
+                rank = "C"
+                title = "🎨 独創的な視点"
+                comment = "AIとは違うユニークな視点を持っていますね。"
+                color = "red"
+
+            # 結果表示エリア
+            st.markdown(f"""
+            <div style="padding: 20px; border: 2px solid #f0f2f6; border-radius: 10px; background-color: #f9f9f9; text-align: center;">
+                <h3>あなたの実験結果</h3>
+                <p style="font-size: 1.2em;">合計スコア: <strong>{total_score}</strong> 点 / 平均スコア: <strong>{avg_score:.1f}</strong> 点</p>
+                <hr>
+                <p style="font-size: 1.5em; color: {color};">判定ランク: <strong>{rank}</strong></p>
+                <h1 style="color: {color}; margin: 0;">{title}</h1>
+                <p style="margin-top: 10px;">{comment}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+
         st.write(f"被験者名: {st.session_state.user_name}")
         st.markdown("---")
         
