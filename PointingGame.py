@@ -114,39 +114,65 @@ def generate_result_image(original_img_pil, heatmap_np, user_point, true_point):
 
 def main():
     st.set_page_config(page_title="Grad-CAM Experiment", layout="centered")
-    st.title("🧪 Grad-CAM ポイント当て実験")
-
+    
+    # サイドバーは「管理者用リセット」のみにする
     with st.sidebar:
-        st.header("実験設定")
-        user_name = st.text_input("お名前 (またはID)", key="user_name_input")
-        
-        ai_knowledge = st.radio(
-            "AI(人工知能)についての知識はありますか？",
-            ("全く知らない", "聞いたことはある", "仕組みを少し知っている", "研究・開発経験がある"),
-            index=1
-        )
-        st.write("---")
-        if st.button("実験をリセット (最初から)"):
+        st.write("🔧 管理者メニュー")
+        if st.button("実験をリセット (最初に戻る)"):
             for key in st.session_state.keys():
                 del st.session_state[key]
             st.rerun()
 
-    if not user_name:
-        st.warning("👈 左のサイドバーでお名前を入力してください。")
-        st.stop()
-
     if 'model' not in st.session_state:
         st.session_state.model = load_model()
     
-    # 全データ保存用のリストを初期化
     if 'all_results' not in st.session_state:
         st.session_state.all_results = []
 
+    # 初期状態を 'welcome' に設定
     if 'game_state' not in st.session_state:
-        st.session_state.game_state = 'setup'
+        st.session_state.game_state = 'welcome'
+
+    # --- WELCOME: 開始画面（入力フォーム） ---
+    if st.session_state.game_state == 'welcome':
+        st.title("🧪 Grad-CAM ポイント当て実験")
+        st.markdown("""
+        この実験は、**「AI（人工知能）が画像のどこを見て判断したか」**を人間がどれくらい予測できるか調査するものです。
+        
+        **実験の流れ:**
+        1. 画像が表示されます。
+        2. 「AIはここを見て判断したはずだ！」と思う場所をクリックしてください。
+        3. 正解（AIの注目箇所）との一致度が表示されます。
+        4. 簡単なアンケートに答えて、次の画像へ進んでください。
+        """)
+        
+        st.markdown("---")
+        st.subheader("👤 被験者情報の入力")
+        st.info("実験を始める前に、以下の情報を入力してください。")
+
+        with st.form("entry_form"):
+            input_name = st.text_input("お名前 (または学籍番号)", placeholder="例: 山田太郎")
+            
+            input_knowledge = st.radio(
+                "Q. AI(人工知能)についての知識はありますか？",
+                ("全く知らない", "聞いたことはある", "仕組みを少し知っている", "研究・開発経験がある"),
+                index=1
+            )
+            
+            start_submitted = st.form_submit_button("入力して実験を開始する", type="primary")
+
+        if start_submitted:
+            if not input_name:
+                st.error("お名前を入力してください。")
+            else:
+                # 情報をsession_stateに保存して、セットアップへ進む
+                st.session_state.user_name = input_name
+                st.session_state.ai_knowledge = input_knowledge
+                st.session_state.game_state = 'setup'
+                st.rerun()
 
     # --- SETUP: 画像リストを作成してシャッフル ---
-    if st.session_state.game_state == 'setup':
+    elif st.session_state.game_state == 'setup':
         if not os.path.exists(IMAGE_FOLDER):
             st.error(f"エラー: '{IMAGE_FOLDER}' フォルダが見つかりません。")
             st.stop()
@@ -160,13 +186,13 @@ def main():
         random.shuffle(image_files)
         st.session_state.image_queue = image_files
         st.session_state.total_images = len(image_files)
-        st.session_state.all_results = [] # リセット時にデータも空にする
+        st.session_state.all_results = []
         
         st.session_state.game_state = 'init'
         st.rerun()
 
-    # --- INIT: 山札から1枚引く ---
-    if st.session_state.game_state == 'init':
+    # --- INIT ---
+    elif st.session_state.game_state == 'init':
         if not st.session_state.image_queue:
             st.session_state.game_state = 'finished'
             st.rerun()
@@ -183,7 +209,6 @@ def main():
             heatmap, label, confidence, true_pt = get_gradcam_data(st.session_state.model, img_array)
             
             st.session_state.update({
-                'temp_click': None,
                 'original_img': img, 
                 'heatmap': heatmap, 
                 'true_point': true_pt,
@@ -192,41 +217,37 @@ def main():
                 'image_filename': selected_file,
                 'current_count': current_count,
                 'start_time': time.time(),
+                'temp_click': None,
                 'game_state': 'playing'
             })
             st.rerun()
 
-# --- PLAYING (クリック式に変更) ---
+    # --- PLAYING ---
     elif st.session_state.game_state == 'playing':
-        st.info(f"被験者: **{user_name}** | 画像: {st.session_state.current_count} / {st.session_state.total_images} 枚目")
+        st.title("🧪 実験プレイ中")
+        # 情報を上部に表示
+        st.caption(f"被験者: {st.session_state.user_name} | 進捗: {st.session_state.current_count} / {st.session_state.total_images} 枚目")
+        
         st.success(f"AI予測: **{st.session_state.label}** (確信度: {st.session_state.confidence*100:.1f}%)")
         st.write("画像をクリックして、AIの注目箇所を指定してください。")
         
-        # 1. 表示する画像を決定 (クリック済なら照準付き、未クリックなら原画)
         if st.session_state.temp_click is None:
             display_img = st.session_state.original_img.resize(IMG_SIZE)
-            caption = "ここをクリックして選択"
         else:
             display_img = draw_crosshair(st.session_state.original_img, 
                                         st.session_state.temp_click[0], 
                                         st.session_state.temp_click[1], 
                                         color=(0, 0, 255))
-            caption = "👇 場所が決まったら下の「決定する」ボタンを押してください"
 
-        # 2. クリック可能な画像を表示
         value = streamlit_image_coordinates(display_img, key="click", width=IMG_SIZE[0], height=IMG_SIZE[1])
 
-        # 3. クリックされたら座標を保存して再描画
         if value is not None:
             new_point = (value['x'], value['y'])
-            # 座標が更新された場合のみリラン
             if st.session_state.temp_click != new_point:
                 st.session_state.temp_click = new_point
                 st.rerun()
 
-        # 4. 決定ボタン (クリック済みの場合のみ有効化)
         if st.session_state.temp_click is not None:
-            st.write(f"選択座標: {st.session_state.temp_click}")
             if st.button("決定する", type="primary"):
                 end_time = time.time()
                 response_time = end_time - st.session_state.start_time
@@ -255,29 +276,29 @@ def main():
         st.image(result_img, caption="青:あなた / 赤:AIの最大注目点", width=350)
 
         st.markdown("---")
-        st.subheader("📝 実験アンケート")
-        st.info("以下のアンケートに回答し、**「回答を確定」**ボタンを押してください。")
+        st.subheader("📝 画像ごとのアンケート")
+        st.info("以下のアンケートに回答し、**「確定して次へ」**を押してください。")
 
         with st.form("survey_form"):
             q_difficulty = st.select_slider(
-                "Q1. AIの注目箇所を予想するのは難しかったですか？",
+                "Q1. 難易度",
                 options=["とても簡単", "簡単", "普通", "難しい", "とても難しい"],
                 value="普通"
             )
 
             q_agree = st.radio(
-                "Q2. 正解（赤点や赤い領域）を見て、AIの判断に納得できましたか？",
-                ["はい、納得できる", "いいえ、納得できない（AIが変だと思う）"],
-                index=0
+                "Q2. AIの判断（赤色）への納得感",
+                ["納得できる", "納得できない"],
+                index=0,
+                horizontal=True
             )
             
-            submitted = st.form_submit_button("回答を確定して次へ進む")
+            submitted = st.form_submit_button("確定して次へ進む")
 
         if submitted:
-            # 1枚分のデータを辞書にする
             current_data = {
-                "user_name": user_name,
-                "ai_knowledge": ai_knowledge,
+                "user_name": st.session_state.user_name,
+                "ai_knowledge": st.session_state.ai_knowledge,
                 "image_file": st.session_state.image_filename,
                 "prediction_label": st.session_state.label,
                 "ai_confidence": st.session_state.confidence,
@@ -293,72 +314,60 @@ def main():
                 "survey_agree": q_agree,
             }
             
-            # 全体データリストに追加
             st.session_state.all_results.append(current_data)
-            
-            # 次の画像へ（山札チェックに戻る）
             st.session_state.game_state = 'init'
             st.rerun()
 
-    # --- FINISHED: 全画像終了 ---
+    # --- FINISHED ---
     elif st.session_state.game_state == 'finished':
+        st.balloons()
+        st.title("🎉 全画像終了です！")
+        st.write(f"被験者名: {st.session_state.user_name}")
+        st.markdown("---")
         
-        st.title("実験終了です！")
-        st.success("すべての画像の回答が終わりました。以下のボタンからデータを保存し、実験者に送付してください。")
-        st.write(f"被験者名: {user_name}")
-        st.write(f"回答した枚数: {len(st.session_state.all_results)}枚")
-
         st.subheader("📊 最終アンケート")
         st.write("実験データの信頼性を評価するため、以下の質問に率直にお答えください。")
-        st.info("※ この回答は、実験の「質（どれくらい真剣に取り組んでもらえたか）」を証明するために使用されます。")
 
-        # 評価の選択肢 (リッカート尺度)
         likert_options = ["1.全くそう思わない", "2.あまりそう思わない", "3.どちらとも言えない", "4.そう思う", "5.強くそう思う"]
         default_val = "3.どちらとも言えない"
 
         with st.form("final_survey"):
-            # 質問A: 没頭感 (Engagement) -> 集中力の証明
             final_q1 = st.select_slider(
                 "Q1. 実験中、集中して（楽しみながら）取り組むことができましたか？",
                 options=likert_options,
                 value=default_val
             )
 
-            # 質問B: 目的意識 (Intentionality) -> データの質の証明
             final_q2 = st.select_slider(
                 "Q2. 高スコアを出そうと工夫したり、考えたりしましたか？",
                 options=likert_options,
                 value=default_val
             )
 
-            # 質問C: ユーザビリティ (Usability) -> システム評価
             final_q3 = st.select_slider(
                 "Q3. 操作（クリックや画面の見方）は直感的で分かりやすかったですか？",
                 options=likert_options,
                 value=default_val
             )
 
-            # 自由記述
             final_comment = st.text_area(
                 "Q4. 自由記述：AIの判定でおかしいと思った点や、感想があれば教えてください。",
                 placeholder="例：猫の画像は納得できたが、車の画像は背景を見ている気がした、など"
             )
 
             final_submit = st.form_submit_button("回答を確定してデータをダウンロード")
-        
-        # 全データをDataFrameに変換
+
         if final_submit:
-            # 全データに最終アンケート結果を一括追加
             if st.session_state.all_results:
                 for res in st.session_state.all_results:
-                    res["final_engagement"] = final_q1  # 没頭感
-                    res["final_intention"] = final_q2   # 目的意識
-                    res["final_usability"] = final_q3   # 操作性
+                    res["final_engagement"] = final_q1
+                    res["final_intention"] = final_q2
+                    res["final_usability"] = final_q3
                     res["final_free_comment"] = final_comment
 
                 df = pd.DataFrame(st.session_state.all_results)
                 csv = df.to_csv(index=False).encode('utf-8')
-                csv_filename = f"{user_name}_FULL_EXPERIMENT.csv"
+                csv_filename = f"{st.session_state.user_name}_FULL_EXPERIMENT.csv"
 
                 st.success("回答ありがとうございました！データが作成されました。")
                 st.download_button(
@@ -370,7 +379,7 @@ def main():
                 )
         
         st.markdown("---")
-        st.info("別の被験者で開始する場合は、サイドバーの「実験をリセット」を押してください。")
+        st.info("保存が完了したらブラウザを閉じてください。別の被験者で開始する場合はサイドバーの「実験をリセット」を押してください。")
 
 if __name__ == "__main__":
     main()
