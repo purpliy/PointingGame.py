@@ -140,41 +140,120 @@ def main():
         この実験は、**「AI（人工知能）が画像のどこを見て判断したか」**を人間がどれくらい予測できるか調査するものです。
         
         **実験の流れ:**
-        1. 画像が表示されます。
-        2. 「AIはここを見て判断したはずだ！」と思う場所をクリックしてください。
-        3. 正解（AIの注目箇所）との一致度が表示されます。
-        4. 簡単なアンケートに答えて、次の画像へ進んでください。
+        1. **練習モード:** 最初に1枚だけ練習を行います。操作に慣れてください。
+        2. **本番:** 本番の画像で実験を行います。
+        3. **アンケート:** 画像ごと、および最後にアンケートがあります。
         """)
         
         st.markdown("---")
         st.subheader("👤 被験者情報の入力")
-        st.info("実験を始める前に、以下の情報を入力してください。")
+        st.info("データの整理用に使用します。本名である必要はありません。")
 
         with st.form("entry_form"):
-            input_name = st.text_input("ニックネーム(本名である必要はありません)")
+            input_name = st.text_input("ニックネーム または 被験者ID", placeholder="例: user01, たなか, Aさん 等")
             
+            # AI知識の質問（ChatGPTなどを明記）
             input_knowledge = st.radio(
-                "Q. AI(人工知能)についての知識はありますか？",
+                "Q. AI(人工知能)についての知識・利用経験はありますか？",
                 (
-                    "全く知らない/使ったことがない", 
-                    "ChatGPTやGeminiなどの生成AIを使ったことがある", 
-                    "AIの仕組み(機械学習の原理など)をある程度理解している", 
-                    "AIの研究・開発経験がある"
-                 ),
+                    "1. 全く知らない / 使ったことがない",
+                    "2. ChatGPTやGeminiなどの生成AIを使ったことがある",
+                    "3. AIの仕組み（機械学習の原理など）をある程度理解している",
+                    "4. AIの研究・開発・実装の経験がある"
+                ),
                 index=1
             )
             
-            start_submitted = st.form_submit_button("入力して実験を開始する", type="primary")
+            # 練習開始ボタン
+            start_submitted = st.form_submit_button("入力して練習を開始する", type="primary")
 
         if start_submitted:
             if not input_name:
-                st.error("お名前を入力してください。")
+                st.error("ニックネームを入力してください。")
             else:
-                # 情報をsession_stateに保存して、セットアップへ進む
                 st.session_state.user_name = input_name
                 st.session_state.ai_knowledge = input_knowledge
-                st.session_state.game_state = 'setup'
+                # 次のフェーズを 'setup' ではなく 'example_init' (練習準備) に設定
+                st.session_state.game_state = 'example_init'
                 st.rerun()
+
+    # --- 🔰 EXAMPLE_INIT: 練習用画像の準備 ---
+    elif st.session_state.game_state == 'example_init':
+        # 練習用画像の存在チェック
+        if not os.path.exists(EXAMPLE_IMAGE_PATH):
+             st.error(f"エラー: 練習用の画像 '{EXAMPLE_IMAGE_PATH}' が見つかりません。app.pyと同じ場所に配置してください。")
+             st.stop()
+
+        with st.spinner('練習用画像を読み込み中...'):
+            img = Image.open(EXAMPLE_IMAGE_PATH).convert("RGB")
+            img_array = preprocess_input(np.expand_dims(np.array(img.resize(IMG_SIZE)), axis=0).astype(np.float32))
+            heatmap, label, confidence, true_pt = get_gradcam_data(st.session_state.model, img_array)
+
+            # 練習用の変数は本番用と分ける（プレフィックスに example_ をつける）
+            st.session_state.update({
+                'example_img': img,
+                'example_heatmap': heatmap,
+                'example_true_pt': true_pt,
+                'example_label': label,
+                'example_temp_click': None, # クリック座標リセット
+                'game_state': 'example_playing' # 練習プレイ画面へ
+            })
+            st.rerun()
+
+    # --- 🔰 EXAMPLE_PLAYING: 練習プレイ画面 ---
+    elif st.session_state.game_state == 'example_playing':
+        st.title("🔰 練習モード")
+        st.info("これは練習です。操作方法を確認してください。（データは保存されません）")
+        st.write(f"AI予測: **{st.session_state.example_label}**")
+        st.write("画像をクリックして、AIの注目箇所を指定してください。")
+
+        # 画像表示ロジック
+        if st.session_state.example_temp_click is None:
+             display_img = st.session_state.example_img.resize(IMG_SIZE)
+        else:
+             display_img = draw_crosshair(st.session_state.example_img, 
+                                          st.session_state.example_temp_click[0], 
+                                          st.session_state.example_temp_click[1],
+                                          color=(0, 0, 255))
+
+        # クリック座標取得
+        value = streamlit_image_coordinates(display_img, key="example_click", width=IMG_SIZE[0], height=IMG_SIZE[1])
+
+        if value is not None:
+            new_point = (value['x'], value['y'])
+            if st.session_state.example_temp_click != new_point:
+                st.session_state.example_temp_click = new_point
+                st.rerun()
+
+        if st.session_state.example_temp_click is not None:
+            if st.button("決定する (練習)", type="primary"):
+                user_pt = st.session_state.example_temp_click
+                score, intensity = calculate_score_by_heatmap(user_pt, st.session_state.example_heatmap)
+
+                st.session_state.update({
+                    'example_score': score,
+                    'example_intensity': intensity,
+                    'game_state': 'example_result' # 練習結果画面へ
+                })
+                st.rerun()
+
+    # --- 🔰 EXAMPLE_RESULT: 練習結果画面 ---
+    elif st.session_state.game_state == 'example_result':
+        st.title("🔰 練習結果")
+        st.metric("スコア", f"{st.session_state.example_score} / 100", f"AIとの一致度: {st.session_state.example_intensity*100:.1f}%")
+        
+        result_img = generate_result_image(st.session_state.example_img, st.session_state.example_heatmap,
+                                           st.session_state.example_temp_click, st.session_state.example_true_pt)
+        st.image(result_img, caption="青:あなた / 赤:AIの最大注目点", width=350)
+        st.write("赤色の部分がAIが注目していた領域です。")
+
+        st.markdown("---")
+        st.success("操作方法は以上です。準備ができたら下のボタンを押して本番を開始してください。")
+        
+        # 本番開始ボタン
+        if st.button("本番の実験を開始する", type="primary"):
+             st.session_state.game_state = 'setup' # 本番準備フェーズへ移行
+             st.rerun()
 
     # --- SETUP: 画像リストを作成してシャッフル ---
     elif st.session_state.game_state == 'setup':
