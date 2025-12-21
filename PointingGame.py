@@ -416,11 +416,11 @@ def main():
 
             # 結果表示エリア
             st.markdown(f"""
-            <div style="padding: 20px; border: 2px solid #f0f2f6; border-radius: 10px; background-color: #f9f9f9; text-align: center;">
+            <div style="text-align: center; padding: 20px;">
                 <h3>あなたの実験結果</h3>
                 <p style="font-size: 1.5em; margin: 10px 0;">合計スコア: <strong>{total_score}</strong> 点</p>
                 <p style="font-size: 1.5em; margin: 10px 0;">平均スコア: <strong>{avg_score:.1f}</strong> 点</p>
-                <p style="color: gray; font-size: 0.9em;">お疲れ様でした！</p>
+                <p style="font-size: 0.9em; opacity: 0.8;">お疲れ様でした！</p>
             </div>
             """, unsafe_allow_html=True)
             st.markdown("---")
