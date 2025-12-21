@@ -138,7 +138,7 @@ def main():
     if st.session_state.game_state == 'welcome':
         st.title("🧪 Grad-CAM ポイント当て実験")
         st.markdown("""
-        この実験は、**「AI（人工知能）が画像のどこを見て判断したか」**を人間がどれくらい予測できるか調査するものです。
+        この実験は、「AI（人工知能）が画像のどこを見て判断したか」を人間がどれくらい予測できるか調査するものです。
         
         **実験の流れ:**
         1. **練習モード:** 最初に1枚だけ練習を行います。操作に慣れてください。
@@ -413,42 +413,20 @@ def main():
             scores = [res['score'] for res in st.session_state.all_results]
             total_score = sum(scores)
             avg_score = total_score / len(scores) if scores else 0
-            
-            # ランク判定ロジック (基準は調整してください)
-            if avg_score >= 90:
-                rank = "S"
-                title = "👑 AIマスター"
-                comment = "すごい！AIの思考をほぼ完璧に読み切っています！"
-                color = "green"
-            elif avg_score >= 80:
-                rank = "A"
-                title = "🤖 AIエキスパート"
-                comment = "かなりAIと気が合いますね。素晴らしい感覚です。"
-                color = "blue"
-            elif avg_score >= 70:
-                rank = "B"
-                title = "👀 AIチャレンジャー"
-                comment = "標準的なスコアです。AIの癖が少しわかってきたかも？"
-                color = "orange"
-            else:
-                rank = "C"
-                title = "🎨 独創的な視点"
-                comment = "AIとは違うユニークな視点を持っていますね。"
-                color = "red"
 
             # 結果表示エリア
             st.markdown(f"""
             <div style="padding: 20px; border: 2px solid #f0f2f6; border-radius: 10px; background-color: #f9f9f9; text-align: center;">
                 <h3>あなたの実験結果</h3>
-                <p style="font-size: 1.2em;">合計スコア: <strong>{total_score}</strong> 点 / 平均スコア: <strong>{avg_score:.1f}</strong> 点</p>
-                <hr>
-                <p style="font-size: 1.5em; color: {color};">判定ランク: <strong>{rank}</strong></p>
-                <h1 style="color: {color}; margin: 0;">{title}</h1>
-                <p style="margin-top: 10px;">{comment}</p>
+                <p style="font-size: 1.5em; margin: 10px 0;">合計スコア: <strong>{total_score}</strong> 点</p>
+                <p style="font-size: 1.5em; margin: 10px 0;">平均スコア: <strong>{avg_score:.1f}</strong> 点</p>
+                <p style="color: gray; font-size: 0.9em;">お疲れ様でした！</p>
             </div>
             """, unsafe_allow_html=True)
-            
             st.markdown("---")
+        else:
+            total_score = 0
+            avg_score = 0
 
         st.write(f"被験者名: {st.session_state.user_name}")
         st.markdown("---")
@@ -492,6 +470,8 @@ def main():
                     res["final_intention"] = final_q2
                     res["final_usability"] = final_q3
                     res["final_free_comment"] = final_comment
+                    res["total_score"] = total_score
+                    res["average_score"] = avg_score
 
                 df = pd.DataFrame(st.session_state.all_results)
                 csv = df.to_csv(index=False).encode('utf-8')
