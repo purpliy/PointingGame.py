@@ -270,11 +270,6 @@ def main():
                 ["はい、納得できる", "いいえ、納得できない（AIが変だと思う）"],
                 index=0
             )
-
-            q_comment = st.text_area(
-                "Q3. 自由記述（AIはどこを見ていたと思いますか？）",
-                placeholder="例：背景に反応していた"
-            )
             
             submitted = st.form_submit_button("回答を確定して次へ進む")
 
@@ -296,7 +291,6 @@ def main():
                 "ai_y": st.session_state.true_point[1],
                 "survey_difficulty": q_difficulty,
                 "survey_agree": q_agree,
-                "survey_comment": q_comment
             }
             
             # 全体データリストに追加
@@ -309,28 +303,74 @@ def main():
     # --- FINISHED: 全画像終了 ---
     elif st.session_state.game_state == 'finished':
         
-        st.title("🎉 実験終了です！")
+        st.title("実験終了です！")
         st.success("すべての画像の回答が終わりました。以下のボタンからデータを保存し、実験者に送付してください。")
         st.write(f"被験者名: {user_name}")
         st.write(f"回答した枚数: {len(st.session_state.all_results)}枚")
+
+        st.subheader("📊 最終アンケート")
+        st.write("実験データの信頼性を評価するため、以下の質問に率直にお答えください。")
+        st.info("※ この回答は、実験の「質（どれくらい真剣に取り組んでもらえたか）」を証明するために使用されます。")
+
+        # 評価の選択肢 (リッカート尺度)
+        likert_options = ["1.全くそう思わない", "2.あまりそう思わない", "3.どちらとも言えない", "4.そう思う", "5.強くそう思う"]
+        default_val = "3.どちらとも言えない"
+
+        with st.form("final_survey"):
+            # 質問A: 没頭感 (Engagement) -> 集中力の証明
+            final_q1 = st.select_slider(
+                "Q1. 実験中、集中して（楽しみながら）取り組むことができましたか？",
+                options=likert_options,
+                value=default_val
+            )
+
+            # 質問B: 目的意識 (Intentionality) -> データの質の証明
+            final_q2 = st.select_slider(
+                "Q2. 高スコアを出そうと工夫したり、考えたりしましたか？",
+                options=likert_options,
+                value=default_val
+            )
+
+            # 質問C: ユーザビリティ (Usability) -> システム評価
+            final_q3 = st.select_slider(
+                "Q3. 操作（クリックや画面の見方）は直感的で分かりやすかったですか？",
+                options=likert_options,
+                value=default_val
+            )
+
+            # 自由記述
+            final_comment = st.text_area(
+                "Q4. 自由記述：AIの判定でおかしいと思った点や、感想があれば教えてください。",
+                placeholder="例：猫の画像は納得できたが、車の画像は背景を見ている気がした、など"
+            )
+
+            final_submit = st.form_submit_button("回答を確定してデータをダウンロード")
         
         # 全データをDataFrameに変換
-        if st.session_state.all_results:
-            df = pd.DataFrame(st.session_state.all_results)
-            csv = df.to_csv(index=False).encode('utf-8')
-            csv_filename = f"{user_name}_FULL_EXPERIMENT.csv"
+        if final_submit:
+            # 全データに最終アンケート結果を一括追加
+            if st.session_state.all_results:
+                for res in st.session_state.all_results:
+                    res["final_engagement"] = final_q1  # 没頭感
+                    res["final_intention"] = final_q2   # 目的意識
+                    res["final_usability"] = final_q3   # 操作性
+                    res["final_free_comment"] = final_comment
 
-            st.download_button(
-                label="💾 実験データをまとめてダウンロード (CSV)",
-                data=csv,
-                file_name=csv_filename,
-                mime='text/csv',
-                type='primary' # 目立つ色にする
-            )
+                df = pd.DataFrame(st.session_state.all_results)
+                csv = df.to_csv(index=False).encode('utf-8')
+                csv_filename = f"{user_name}_FULL_EXPERIMENT.csv"
+
+                st.success("回答ありがとうございました！データが作成されました。")
+                st.download_button(
+                    label="💾 実験データをダウンロード (CSV)",
+                    data=csv,
+                    file_name=csv_filename,
+                    mime='text/csv',
+                    type='primary'
+                )
         
         st.markdown("---")
         st.info("別の被験者で開始する場合は、サイドバーの「実験をリセット」を押してください。")
 
 if __name__ == "__main__":
-
     main()
