@@ -498,7 +498,6 @@ def main():
                     res["final_usability"] = final_q3
                     res["final_free_comment"] = final_comment
                     res["total_score"] = total_score
-                    res["average_score"] = avg_score
 
                 df = pd.DataFrame(st.session_state.all_results)
                 csv = df.to_csv(index=False).encode('utf-8')
