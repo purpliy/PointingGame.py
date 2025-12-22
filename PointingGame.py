@@ -26,14 +26,16 @@ def load_model():
     return MobileNetV2(weights='imagenet')
 
 def get_gradcam_data(model, input_img_array):
+    # 1. Grad-CAM用のモデル構築
     grad_model = tf.keras.models.Model(
         inputs=[model.inputs],
         outputs=[model.get_layer(LAST_CONV_LAYER_NAME).output, model.output]
     )
 
+    # 2. 勾配計算 (ここは1位の予測に対して行う)
     with tf.GradientTape() as tape:
         last_conv_layer_output, preds = grad_model(input_img_array)
-        pred_index = tf.argmax(preds[0])
+        pred_index = tf.argmax(preds[0]) # 最も確率が高いクラス
         class_channel = preds[:, pred_index]
 
     grads = tape.gradient(class_channel, last_conv_layer_output)
@@ -46,18 +48,36 @@ def get_gradcam_data(model, input_img_array):
     heatmap = tf.maximum(heatmap, 0) / tf.math.reduce_max(heatmap)
     heatmap_np = heatmap.numpy()
 
-    decoded = decode_predictions(model.predict(input_img_array), top=1)[0][0]
-    en_label = decoded[1]
-    confidence = decoded[2]
+    # 3. トップ3の予測を取得して翻訳
+    decoded_list = decode_predictions(model.predict(input_img_array), top=3)[0]
     
-    try:
-        translator = Translator()
-        ja_label = translator.translate(en_label, src='en', dest='ja').text
-    except:
-        ja_label = en_label
+    top3_info = [] # 結果を格納するリスト
+    translator = Translator()
 
-    prediction_label = f"{ja_label} ({en_label})"
+    for i, (id, label, prob) in enumerate(decoded_list):
+        try:
+            # 英語ラベルを日本語に翻訳
+            ja_label = translator.translate(label, src='en', dest='ja').text
+        except:
+            ja_label = label
+        
+        # 表示用テキスト作成
+        info_text = f"{i+1}位: {ja_label} ({label}) - {prob*100:.1f}%"
+        top3_info.append(info_text)
+
+    # 1位の情報（ゲーム判定用）
+    top1_label_en = decoded_list[0][1]
+    top1_confidence = decoded_list[0][2]
     
+    # 1位の日本語ラベル取得（リストの最初）
+    try:
+        top1_label_ja = translator.translate(top1_label_en, src='en', dest='ja').text
+    except:
+        top1_label_ja = top1_label_en
+    
+    prediction_label = f"{top1_label_ja} ({top1_label_en})"
+
+    # 4. ヒートマップ座標計算
     result_coords = np.unravel_index(np.argmax(heatmap_np), heatmap_np.shape)
     y_norm = result_coords[0] / heatmap_np.shape[0]
     x_norm = result_coords[1] / heatmap_np.shape[1]
@@ -65,15 +85,14 @@ def get_gradcam_data(model, input_img_array):
     true_point = (int((x_norm + 0.5/heatmap_np.shape[1]) * IMG_SIZE[0]), 
                   int((y_norm + 0.5/heatmap_np.shape[0]) * IMG_SIZE[1]))
 
-    return heatmap_np, prediction_label, confidence, true_point
+    # top3_info (リスト) も返すように変更
+    return heatmap_np, prediction_label, top1_confidence, true_point, top3_info
 
 def calculate_score(user_point, true_point):
-    """距離を計算する関数"""
     dist = math.sqrt((user_point[0] - true_point[0])**2 + (user_point[1] - true_point[1])**2)
     return dist
 
 def calculate_score_by_heatmap(user_point, heatmap_np):
-    """ヒートマップ強度からスコア計算"""
     h, w = heatmap_np.shape
     grid_x = int(user_point[0] / IMG_SIZE[0] * w)
     grid_y = int(user_point[1] / IMG_SIZE[1] * h)
@@ -116,7 +135,6 @@ def generate_result_image(original_img_pil, heatmap_np, user_point, true_point):
 def main():
     st.set_page_config(page_title="Grad-CAM Experiment", layout="centered")
     
-    # サイドバーは「管理者用リセット」のみにする
     with st.sidebar:
         st.write("🔧 管理者メニュー")
         if st.button("実験をリセット (最初に戻る)"):
@@ -130,18 +148,17 @@ def main():
     if 'all_results' not in st.session_state:
         st.session_state.all_results = []
 
-    # 初期状態を 'welcome' に設定
     if 'game_state' not in st.session_state:
         st.session_state.game_state = 'welcome'
 
-    # --- WELCOME: 開始画面（入力フォーム） ---
+    # --- WELCOME ---
     if st.session_state.game_state == 'welcome':
         st.title("🧪 Grad-CAM ポイント当て実験")
         st.markdown("""
-        この実験は、「AI（人工知能）が画像のどこを見て判断したか」を人間がどれくらい予測できるか調査するものです。
+        この実験は、**「AI（人工知能）が画像のどこを見て判断したか」**を人間がどれくらい予測できるか調査するものです。
         
         **実験の流れ:**
-        1. **練習モード:** 最初に1枚だけ練習を行います。操作に慣れてください。
+        1. **練習モード:** 最初に1枚だけ練習を行います。
         2. **本番:** 本番の画像で実験を行います。
         3. **アンケート:** 画像ごと、および最後にアンケートがあります。
         """)
@@ -153,7 +170,6 @@ def main():
         with st.form("entry_form"):
             input_name = st.text_input("ニックネーム または 被験者ID", placeholder="例: user01, たなか, Aさん 等")
             
-            # AI知識の質問（ChatGPTなどを明記）
             input_knowledge = st.radio(
                 "Q. AI(人工知能)についての知識・利用経験はありますか？",
                 (
@@ -165,7 +181,6 @@ def main():
                 index=1
             )
             
-            # 練習開始ボタン
             start_submitted = st.form_submit_button("入力して練習を開始する", type="primary")
 
         if start_submitted:
@@ -174,41 +189,46 @@ def main():
             else:
                 st.session_state.user_name = input_name
                 st.session_state.ai_knowledge = input_knowledge
-                # 次のフェーズを 'setup' ではなく 'example_init' (練習準備) に設定
                 st.session_state.game_state = 'example_init'
                 st.rerun()
 
-    # --- 🔰 EXAMPLE_INIT: 練習用画像の準備 ---
+    # --- 🔰 EXAMPLE_INIT ---
     elif st.session_state.game_state == 'example_init':
-        # 練習用画像の存在チェック
         if not os.path.exists(EXAMPLE_IMAGE_PATH):
-             st.error(f"エラー: 練習用の画像 '{EXAMPLE_IMAGE_PATH}' が見つかりません。app.pyと同じ場所に配置してください。")
+             st.error(f"エラー: 練習用の画像 '{EXAMPLE_IMAGE_PATH}' が見つかりません。")
              st.stop()
 
         with st.spinner('練習用画像を読み込み中...'):
             img = Image.open(EXAMPLE_IMAGE_PATH).convert("RGB")
             img_array = preprocess_input(np.expand_dims(np.array(img.resize(IMG_SIZE)), axis=0).astype(np.float32))
-            heatmap, label, confidence, true_pt = get_gradcam_data(st.session_state.model, img_array)
+            
+            # 戻り値が増えたので受け取り変数を追加 (top3_info)
+            heatmap, label, confidence, true_pt, top3_info = get_gradcam_data(st.session_state.model, img_array)
 
-            # 練習用の変数は本番用と分ける（プレフィックスに example_ をつける）
             st.session_state.update({
                 'example_img': img,
                 'example_heatmap': heatmap,
                 'example_true_pt': true_pt,
                 'example_label': label,
-                'example_temp_click': None, # クリック座標リセット
-                'game_state': 'example_playing' # 練習プレイ画面へ
+                'example_top3': top3_info, # 練習用Top3保存
+                'example_temp_click': None,
+                'game_state': 'example_playing'
             })
             st.rerun()
 
-    # --- 🔰 EXAMPLE_PLAYING: 練習プレイ画面 ---
+    # --- 🔰 EXAMPLE_PLAYING ---
     elif st.session_state.game_state == 'example_playing':
         st.title("🔰 練習モード")
-        st.info("これは練習です。操作方法を確認してください。（データは保存されません）")
-        st.write(f"AI予測: **{st.session_state.example_label}**")
+        st.info("これは練習です。（データは保存されません）")
+        
+        # 👇 修正: 練習モードでもTop3を表示
+        st.subheader(f"AI予測: **{st.session_state.example_label}**")
+        with st.expander("AIの予測内訳 (Top 3) を見る", expanded=True):
+            for info in st.session_state.example_top3:
+                st.write(info)
+        
         st.write("画像をクリックして、AIの注目箇所を指定してください。")
 
-        # 画像表示ロジック
         if st.session_state.example_temp_click is None:
              display_img = st.session_state.example_img.resize(IMG_SIZE)
         else:
@@ -217,7 +237,6 @@ def main():
                                           st.session_state.example_temp_click[1],
                                           color=(0, 0, 255))
 
-        # クリック座標取得
         value = streamlit_image_coordinates(display_img, key="example_click", width=IMG_SIZE[0], height=IMG_SIZE[1])
 
         if value is not None:
@@ -234,11 +253,11 @@ def main():
                 st.session_state.update({
                     'example_score': score,
                     'example_intensity': intensity,
-                    'game_state': 'example_result' # 練習結果画面へ
+                    'game_state': 'example_result'
                 })
                 st.rerun()
 
-    # --- 🔰 EXAMPLE_RESULT: 練習結果画面 ---
+    # --- 🔰 EXAMPLE_RESULT ---
     elif st.session_state.game_state == 'example_result':
         st.title("🔰 練習結果")
         st.metric("スコア", f"{st.session_state.example_score} / 100", f"AIとの一致度: {st.session_state.example_intensity*100:.1f}%")
@@ -246,17 +265,15 @@ def main():
         result_img = generate_result_image(st.session_state.example_img, st.session_state.example_heatmap,
                                            st.session_state.example_temp_click, st.session_state.example_true_pt)
         st.image(result_img, caption="青:あなた / 赤:AIの最大注目点", width=350)
-        st.write("赤色の部分がAIが注目していた領域です。")
-
-        st.markdown("---")
-        st.success("操作方法は以上です。準備ができたら下のボタンを押して本番を開始してください。")
         
-        # 本番開始ボタン
+        st.markdown("---")
+        st.success("準備ができたら下のボタンを押して本番を開始してください。")
+        
         if st.button("本番の実験を開始する", type="primary"):
-             st.session_state.game_state = 'setup' # 本番準備フェーズへ移行
+             st.session_state.game_state = 'setup'
              st.rerun()
 
-    # --- SETUP: 画像リストを作成してシャッフル ---
+    # --- SETUP ---
     elif st.session_state.game_state == 'setup':
         if not os.path.exists(IMAGE_FOLDER):
             st.error(f"エラー: '{IMAGE_FOLDER}' フォルダが見つかりません。")
@@ -276,7 +293,7 @@ def main():
         st.session_state.game_state = 'init'
         st.rerun()
 
-    # --- INIT ---
+    # --- INIT (本番) ---
     elif st.session_state.game_state == 'init':
         if not st.session_state.image_queue:
             st.session_state.game_state = 'finished'
@@ -287,11 +304,12 @@ def main():
         image_path = os.path.join(IMAGE_FOLDER, selected_file)
         current_count = st.session_state.total_images - len(st.session_state.image_queue)
 
-        with st.spinner(f'画像を読み込み中... ({current_count}/{st.session_state.total_images}枚目)'):
+        with st.spinner(f'本番画像を読み込み中... ({current_count}/{st.session_state.total_images}枚目)'):
             img = Image.open(image_path).convert("RGB")
             img_array = preprocess_input(np.expand_dims(np.array(img.resize(IMG_SIZE)), axis=0).astype(np.float32))
             
-            heatmap, label, confidence, true_pt = get_gradcam_data(st.session_state.model, img_array)
+            # 👇 修正: top3_info を受け取る
+            heatmap, label, confidence, true_pt, top3_info = get_gradcam_data(st.session_state.model, img_array)
             
             st.session_state.update({
                 'original_img': img, 
@@ -299,6 +317,7 @@ def main():
                 'true_point': true_pt,
                 'label': label,
                 'confidence': confidence,
+                'top3_info': top3_info, # Top3リストを保存
                 'image_filename': selected_file,
                 'current_count': current_count,
                 'start_time': time.time(),
@@ -307,13 +326,20 @@ def main():
             })
             st.rerun()
 
-    # --- PLAYING ---
+    # --- PLAYING (本番) ---
     elif st.session_state.game_state == 'playing':
-        st.title("🧪 実験プレイ中")
-        # 情報を上部に表示
+        st.title("🧪 実験プレイ中 (本番)")
         st.caption(f"被験者: {st.session_state.user_name} | 進捗: {st.session_state.current_count} / {st.session_state.total_images} 枚目")
         
-        st.success(f"AI予測: **{st.session_state.label}** (確信度: {st.session_state.confidence*100:.1f}%)")
+        # 👇 修正: AI予測をTop3表示に変更
+        st.subheader(f"AI予測: **{st.session_state.label}**")
+        
+        # 予測の詳細（トップ3）を見やすく表示
+        with st.container():
+            st.markdown("##### 🔍 AIの判断内訳")
+            for info in st.session_state.top3_info:
+                st.text(info) # シンプルなテキストで表示
+        
         st.write("画像をクリックして、AIの注目箇所を指定してください。")
         
         if st.session_state.temp_click is None:
@@ -381,12 +407,16 @@ def main():
             submitted = st.form_submit_button("確定して次へ進む")
 
         if submitted:
+            # データ保存時に Top3の情報も文字列として結合して保存する（分析用）
+            top3_str = " | ".join(st.session_state.top3_info)
+            
             current_data = {
                 "user_name": st.session_state.user_name,
                 "ai_knowledge": st.session_state.ai_knowledge,
                 "image_file": st.session_state.image_filename,
                 "prediction_label": st.session_state.label,
                 "ai_confidence": st.session_state.confidence,
+                "top3_predictions": top3_str, # 👈 追加: Top3内訳を保存
                 "response_time": st.session_state.response_time,
                 "score": st.session_state.score,
                 "intensity": st.session_state.intensity,
@@ -407,14 +437,12 @@ def main():
     elif st.session_state.game_state == 'finished':
         
         st.title("🎉 全画像終了です！")
-
+        
         if st.session_state.all_results:
-            # スコアのリストを取り出す
             scores = [res['score'] for res in st.session_state.all_results]
             total_score = sum(scores)
             avg_score = total_score / len(scores) if scores else 0
-
-            # 結果表示エリア
+            
             st.markdown(f"""
             <div style="text-align: center; padding: 20px;">
                 <h3>あなたの実験結果</h3>
@@ -429,6 +457,7 @@ def main():
             avg_score = 0
 
         st.write(f"被験者名: {st.session_state.user_name}")
+        st.write(f"回答した枚数: {len(st.session_state.all_results)}枚")
         st.markdown("---")
         
         st.subheader("📊 最終アンケート")
