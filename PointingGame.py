@@ -12,6 +12,18 @@ import random
 import time
 from streamlit_image_coordinates import streamlit_image_coordinates
 
+st.sidebar.markdown("---")
+st.sidebar.subheader("📚 開発環境バージョン")
+st.sidebar.code(f"""
+Streamlit: {st.__version__}
+TensorFlow: {tf.__version__}
+NumPy: {np.__version__}
+OpenCV: {cv2.__version__}
+Pandas: {pd.__version__}
+Googletrans: {googletrans.__version__}
+Image Coordinates: {streamlit_image_coordinates.__version__}
+""")
+
 # --- 1. 定数と初期設定 ---
 
 IMG_SIZE = (224, 224)
