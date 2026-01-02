@@ -20,7 +20,6 @@ TensorFlow: {tf.__version__}
 NumPy: {np.__version__}
 OpenCV: {cv2.__version__}
 Pandas: {pd.__version__}
-Googletrans: {googletrans.__version__}
 Image Coordinates: {streamlit_image_coordinates.__version__}
 """)
 
