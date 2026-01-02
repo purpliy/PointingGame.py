@@ -12,17 +12,6 @@ import random
 import time
 from streamlit_image_coordinates import streamlit_image_coordinates
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("📚 開発環境バージョン")
-st.sidebar.code(f"""
-Streamlit: {st.__version__}
-TensorFlow: {tf.__version__}
-NumPy: {np.__version__}
-OpenCV: {cv2.__version__}
-Pandas: {pd.__version__}
-Image Coordinates: {streamlit_image_coordinates.__version__}
-""")
-
 # --- 1. 定数と初期設定 ---
 
 IMG_SIZE = (224, 224)
@@ -528,3 +517,31 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+if __name__ == "__main__":
+    # バージョン確認のために必要なライブラリをインポート
+    import streamlit as st
+    import tensorflow as tf
+    import pandas as pd
+    import numpy as np
+    import cv2
+    import googletrans
+    from importlib.metadata import version, PackageNotFoundError # 👈 これを使います
+
+    # Image Coordinatesのバージョンを安全に取得
+    try:
+        coord_ver = version("streamlit-image-coordinates")
+    except PackageNotFoundError:
+        coord_ver = "不明"
+
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📚 開発環境バージョン")
+    st.sidebar.code(f"""
+    Streamlit: {st.__version__}
+    TensorFlow: {tf.__version__}
+    NumPy: {np.__version__}
+    OpenCV: {cv2.__version__}
+    Pandas: {pd.__version__}
+    Googletrans: {googletrans.__version__}
+    Image Coordinates: {coord_ver}
+    """)
