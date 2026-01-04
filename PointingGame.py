@@ -17,7 +17,7 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 IMG_SIZE = (224, 224)
 LAST_CONV_LAYER_NAME = "out_relu"
 IMAGE_FOLDER = "images"
-EXAMPLE_IMAGE_PATH = "dog2.jpg"
+EXAMPLE_IMAGE_PATH = "goldenretriever.jpg"
 
 # --- 2. モデルとGrad-CAM計算 ---
 
