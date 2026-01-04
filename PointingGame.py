@@ -440,6 +440,7 @@ def main():
         
         if st.session_state.all_results:
             scores = [res['score'] for res in st.session_state.all_results]
+            times = [res['response_time'] for res in st.session_state.all_results]
             total_score = sum(scores)
             avg_score = total_score / len(scores) if scores else 0
             avg_time = sum(times) / len(times) if times else 0
@@ -516,7 +517,7 @@ def main():
                 'スコア': scores
             })
             st.bar_chart(chart_data, x='画像番号', y='スコア', color="#FF4B4B")
-            
+
         else:
             total_score = 0
             avg_score = 0
