@@ -504,7 +504,7 @@ def main():
             # --- 📊 GWAP要素3: スコアの推移グラフ ---
             st.write("###### 📈 画像ごとのスコア推移")
             chart_data = pd.DataFrame({
-                '画像番号': [f"{i+1}枚目" for i in range(len(scores))],
+                '画像番号': range(1, len(scores) + 1),
                 'スコア': scores
             })
             st.bar_chart(chart_data, x='画像番号', y='スコア', color="#FF4B4B")
