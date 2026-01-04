@@ -444,15 +444,6 @@ def main():
             total_score = sum(scores)
             avg_score = total_score / len(scores) if scores else 0
             avg_time = sum(times) / len(times) if times else 0
-            
-            st.markdown(f"""
-            <div style="text-align: center; padding: 20px;">
-                <h3>あなたの実験結果</h3>
-                <p style="font-size: 1.5em; margin: 10px 0;">合計スコア: <strong>{total_score}</strong> 点</p>
-                <p style="font-size: 0.9em; opacity: 0.8;">お疲れ様でした！</p>
-            </div>
-            """, unsafe_allow_html=True)
-            st.markdown("---")
 
             # --- 🏆 GWAP要素1: プレイスタイル診断 ---
             # スコアと時間に基づいて「称号」を与える
@@ -485,7 +476,7 @@ def main():
             st.markdown(f"""
             <div style="padding: 20px; border-radius: 15px; background-color: #f0f2f6; margin-bottom: 20px;">
                 <h2 style="text-align: center; color: #31333F;">{icon} {player_type}</h2>
-                <p style="text-align: center; font-size: 1.1em;">{type_desc}</p>
+                <p style="text-align: center; font-size: 1.1em; color: #31333F;">{type_desc}</p>
                 <hr style="border: 1px solid #ddd;">
                 <div style="display: flex; justify-content: space-around; text-align: center;">
                     <div>
@@ -498,7 +489,7 @@ def main():
                     </div>
                     <div>
                         <p style="font-size: 0.9em; color: gray; margin: 0;">平均回答時間</p>
-                        <p style="font-size: 1.8em; font-weight: bold; margin: 0;">{avg_time:.1f}秒</p>
+                        <p style="font-size: 1.8em; font-weight: bold; margin: 0; color: #31333F;">{avg_time:.1f}秒</p>
                     </div>
                 </div>
             </div>
