@@ -441,6 +441,8 @@ def main():
         if st.session_state.all_results:
             scores = [res['score'] for res in st.session_state.all_results]
             total_score = sum(scores)
+            avg_score = total_score / len(scores) if scores else 0
+            avg_time = sum(times) / len(times) if times else 0
             
             st.markdown(f"""
             <div style="text-align: center; padding: 20px;">
@@ -450,6 +452,71 @@ def main():
             </div>
             """, unsafe_allow_html=True)
             st.markdown("---")
+
+            # --- 🏆 GWAP要素1: プレイスタイル診断 ---
+            # スコアと時間に基づいて「称号」を与える
+            if avg_score >= 80:
+                player_type = "🤖 AIシンクロナイザー（AI同調型）"
+                type_desc = "AIの思考回路を完全に理解しています。あなたのデータは「AIの正解基準」として非常に価値があります。"
+                icon = "👑"
+            elif avg_score >= 60 and avg_time < 3.0:
+                player_type = "⚡ スピード・アナリスト（直感型）"
+                type_desc = "迷いのない直感的な判断力を持っています。AIが人間をどう認識するかという研究に貢献します。"
+                icon = "🚀"
+            elif avg_score >= 60:
+                player_type = "🧠 ディープ・シンカー（熟考型）"
+                type_desc = "慎重にAIの意図を読み解くスタイルです。あなたの思考プロセスは深い分析に役立ちます。"
+                icon = "🧐"
+            elif avg_score < 40:
+                player_type = "🦄 ヒューマン・アイ（独自視点型）"
+                type_desc = "AIとは異なる、人間ならではのユニークな視点を持っています。この「ズレ」こそが本研究で最も重要なデータです！"
+                icon = "🎨"
+            else:
+                player_type = "⚖️ バランサー（標準型）"
+                type_desc = "バランスの取れた視点を持っています。統計的な比較を行う上で基準となる貴重なデータです。"
+                icon = "✨"
+
+            # --- 🔍 GWAP要素2: 研究貢献度（ズレの発見） ---
+            # スコアが低かった（AIと意見が合わなかった）画像の枚数をカウント
+            disagreements = len([s for s in scores if s < 50])
+            
+            # リザルト表示エリア
+            st.markdown(f"""
+            <div style="padding: 20px; border-radius: 15px; background-color: #f0f2f6; margin-bottom: 20px;">
+                <h2 style="text-align: center; color: #31333F;">{icon} {player_type}</h2>
+                <p style="text-align: center; font-size: 1.1em;">{type_desc}</p>
+                <hr style="border: 1px solid #ddd;">
+                <div style="display: flex; justify-content: space-around; text-align: center;">
+                    <div>
+                        <p style="font-size: 0.9em; color: gray; margin: 0;">合計スコア</p>
+                        <p style="font-size: 1.8em; font-weight: bold; margin: 0; color: #FF4B4B;">{total_score}</p>
+                    </div>
+                    <div>
+                        <p style="font-size: 0.9em; color: gray; margin: 0;">平均スコア</p>
+                        <p style="font-size: 1.8em; font-weight: bold; margin: 0; color: #1f77b4;">{avg_score:.1f}</p>
+                    </div>
+                    <div>
+                        <p style="font-size: 0.9em; color: gray; margin: 0;">平均回答時間</p>
+                        <p style="font-size: 1.8em; font-weight: bold; margin: 0;">{avg_time:.1f}秒</p>
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # 「発見」のフィードバック
+            if disagreements > 0:
+                st.info(f"💡 **研究への貢献:** あなたは、AIと人間の認識が大きく食い違う事例を **{disagreements}件** 発見しました。これはAIの改善の手がかりとなる重要なデータです。")
+            else:
+                st.success("🎉 **研究への貢献:** あなたの視点はAIと非常に高い精度で一致しました。これはAIの判断が人間に近いことを示す重要な証拠です。")
+
+            # --- 📊 GWAP要素3: スコアの推移グラフ ---
+            st.write("###### 📈 画像ごとのスコア推移")
+            chart_data = pd.DataFrame({
+                '画像番号': [f"{i+1}枚目" for i in range(len(scores))],
+                'スコア': scores
+            })
+            st.bar_chart(chart_data, x='画像番号', y='スコア', color="#FF4B4B")
+            
         else:
             total_score = 0
             avg_score = 0
