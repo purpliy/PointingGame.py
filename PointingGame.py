@@ -377,7 +377,7 @@ def main():
                 })
                 st.rerun()
 
-    # --- RESULT ---
+# --- RESULT ---
     elif st.session_state.game_state == 'result':
         st.metric("スコア", f"{st.session_state.score} / 100", f"AIとの一致度: {st.session_state.intensity*100:.1f}%")
         st.caption(f"回答時間: {st.session_state.response_time:.2f}秒 | 距離誤差: {st.session_state.dist:.1f}px")
@@ -397,6 +397,8 @@ def main():
                 value="普通"
             )
 
+            st.markdown("---")
+            
             q_agree = st.radio(
                 "Q2. AIの判断（赤色）への納得感",
                 ["納得できる", "納得できない"],
@@ -404,10 +406,30 @@ def main():
                 horizontal=True
             )
             
+            # 👇 追加：理由を聞く（常に表示しておき、ラベルで案内する）
+            reason_options = [
+                "- (納得できる場合はこのまま)", 
+                "背景や関係ない場所を見ている",
+                "重要な箇所（顔など）を見ていない",
+                "注目範囲が広すぎる/ぼやけている",
+                "全く違う物体を見ている",
+                "その他"
+            ]
+            
+            q_disagree_reason = st.selectbox(
+                "Q2-1. 【納得できない場合】 その理由に最も近いものは？",
+                reason_options
+            )
+            
             submitted = st.form_submit_button("確定して次へ進む")
 
         if submitted:
-            # データ保存時に Top3の情報も文字列として結合して保存する（分析用）
+            # データ整理：納得できているなら理由は空欄にする
+            final_reason = ""
+            if q_agree == "納得できない" and q_disagree_reason != "- (納得できる場合はこのまま)":
+                final_reason = q_disagree_reason
+
+            # データ保存時に Top3の情報も文字列として結合して保存する
             top3_str = " | ".join(st.session_state.top3_info)
             
             current_data = {
@@ -416,7 +438,7 @@ def main():
                 "image_file": st.session_state.image_filename,
                 "prediction_label": st.session_state.label,
                 "ai_confidence": st.session_state.confidence,
-                "top3_predictions": top3_str, # 👈 追加: Top3内訳を保存
+                "top3_predictions": top3_str,
                 "response_time": st.session_state.response_time,
                 "score": st.session_state.score,
                 "intensity": st.session_state.intensity,
@@ -427,12 +449,12 @@ def main():
                 "ai_y": st.session_state.true_point[1],
                 "survey_difficulty": q_difficulty,
                 "survey_agree": q_agree,
+                "survey_disagree_reason": final_reason,
             }
             
             st.session_state.all_results.append(current_data)
             st.session_state.game_state = 'init'
             st.rerun()
-
     # --- FINISHED ---
     elif st.session_state.game_state == 'finished':
         
