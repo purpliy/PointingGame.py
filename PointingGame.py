@@ -407,54 +407,59 @@ def main():
             )
             
             # 👇 追加：理由を聞く（常に表示しておき、ラベルで案内する）
-            reason_options = [
-                "- (納得できる場合はこのまま)", 
-                "背景や関係ない場所を見ている",
-                "重要な箇所（顔など）を見ていない",
-                "注目範囲が広すぎる/ぼやけている",
-                "全く違う物体を見ている",
-                "その他"
-            ]
-            
-            q_disagree_reason = st.selectbox(
-                "Q2-1. 【納得できない場合】 その理由に最も近いものは？",
-                reason_options
-            )
-            
-            submitted = st.form_submit_button("確定して次へ進む")
+            final_reason = "" # デフォルトは空欄
+        
+            if q_agree == "納得できない":
+                reason_options = [
+                    "背景や関係ない場所を見ている",
+                    "重要な箇所（顔など）を見ていない",
+                    "注目範囲が広すぎる/ぼやけている",
+                    "全く違う物体を見ている",
+                    "その他"
+                ]
+                # 理由を選択させる
+                q_disagree_selection = st.selectbox(
+                    "Q2-1. 納得できない主な理由を教えてください",
+                    reason_options
+                )
+                
+                if q_disagree_selection == "その他":
+                    q_free_text = st.text_input("具体的な理由を自由に入力してください", placeholder="例: AIの注目点が複数に分かれているのがおかしい、など")
+                    final_reason = f"その他: {q_free_text}" if q_free_text else "その他（記述なし）"
+                else:
+                    final_reason = q_disagree_selection
 
-        if submitted:
-            # データ整理：納得できているなら理由は空欄にする
-            final_reason = ""
-            if q_agree == "納得できない" and q_disagree_reason != "- (納得できる場合はこのまま)":
-                final_reason = q_disagree_reason
+            st.markdown("<br>", unsafe_allow_html=True) # 少し余白
 
-            # データ保存時に Top3の情報も文字列として結合して保存する
-            top3_str = " | ".join(st.session_state.top3_info)
-            
-            current_data = {
-                "user_name": st.session_state.user_name,
-                "ai_knowledge": st.session_state.ai_knowledge,
-                "image_file": st.session_state.image_filename,
-                "prediction_label": st.session_state.label,
-                "ai_confidence": st.session_state.confidence,
-                "top3_predictions": top3_str,
-                "response_time": st.session_state.response_time,
-                "score": st.session_state.score,
-                "intensity": st.session_state.intensity,
-                "error_px": st.session_state.dist,
-                "user_x": st.session_state.user_point[0],
-                "user_y": st.session_state.user_point[1],
-                "ai_x": st.session_state.true_point[0],
-                "ai_y": st.session_state.true_point[1],
-                "survey_difficulty": q_difficulty,
-                "survey_agree": q_agree,
-                "survey_disagree_reason": final_reason,
-            }
-            
-            st.session_state.all_results.append(current_data)
-            st.session_state.game_state = 'init'
-            st.rerun()
+            # 普通のボタンにする（フォーム送信ボタンではない）
+            if st.button("確定して次へ進む", type="primary"):
+                
+                # データ保存時に Top3の情報も文字列として結合して保存する
+                top3_str = " | ".join(st.session_state.top3_info)
+                
+                current_data = {
+                    "user_name": st.session_state.user_name,
+                    "ai_knowledge": st.session_state.ai_knowledge,
+                    "image_file": st.session_state.image_filename,
+                    "prediction_label": st.session_state.label,
+                    "ai_confidence": st.session_state.confidence,
+                    "top3_predictions": top3_str,
+                    "response_time": st.session_state.response_time,
+                    "score": st.session_state.score,
+                    "intensity": st.session_state.intensity,
+                    "error_px": st.session_state.dist,
+                    "user_x": st.session_state.user_point[0],
+                    "user_y": st.session_state.user_point[1],
+                    "ai_x": st.session_state.true_point[0],
+                    "ai_y": st.session_state.true_point[1],
+                    "survey_difficulty": q_difficulty,
+                    "survey_agree": q_agree,
+                    "survey_disagree_reason": final_reason, # 👈 理由（なければ空欄）を保存
+                }
+                
+                st.session_state.all_results.append(current_data)
+                st.session_state.game_state = 'init'
+                st.rerun()
     # --- FINISHED ---
     elif st.session_state.game_state == 'finished':
         
