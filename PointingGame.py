@@ -134,6 +134,14 @@ def generate_result_image(original_img_pil, heatmap_np, user_point, true_point):
 
 def main():
     st.set_page_config(page_title="Grad-CAM Experiment", layout="centered")
+
+    st.warning("⚠️ **重要：LINEやInstagramから開いている方へ**")
+    st.info("""
+    このアプリは**LINEなどのアプリ内ブラウザでは、最後のデータ保存ができない**場合があります。
+    
+    画面右上のメニュー（︙ または 共有アイコン）から 「ブラウザで開く (Safari / Chrome)」等を選択して、標準ブラウザで開き直してから実験を開始してください。
+    """)
+    st.markdown("---")
     
     with st.sidebar:
         st.write("🔧 管理者メニュー")
