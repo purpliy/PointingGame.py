@@ -139,7 +139,7 @@ def main():
     st.info("""
     このアプリは**LINEなどのアプリ内ブラウザでは、最後のデータ保存ができない**場合があります。
     
-    画面右上のメニュー（︙ または 共有アイコン）から 「ブラウザで開く (Safari / Chrome)」等を選択して、標準ブラウザで開き直してから実験を開始してください。
+    お手数をおかけしますが、画面右上のメニュー（︙ または 共有アイコン）から 「ブラウザで開く (Safari / Chrome)」等を選択して、標準ブラウザで開き直してから実験を開始してください。
     """)
     st.markdown("---")
     
@@ -638,4 +638,5 @@ if __name__ == "__main__":
     Pandas: {pd.__version__}
     Googletrans: {googletrans.__version__}
     Image Coordinates: {coord_ver}
+
     """)
