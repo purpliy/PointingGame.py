@@ -66,6 +66,7 @@ TEXT = {
         'final_q3': "Q3. 操作は分かりやすかったですか？",
         'final_q4': "Q4. 自由記述（感想や気づき）",
         'btn_download': "💾 実験データをダウンロード (CSV)",
+        'btn_confirm': "回答を確定する",
         'btn_end': "🔄 実験を終了してリセット (トップへ戻る)",
         'warning_line': "⚠️ 重要：LINEやInstagramから開いている方へ",
         'info_line': "データの保存ができない場合があるため、右上のメニューから「ブラウザで開く (Safari/Chrome)」を選択してください。",
@@ -121,6 +122,7 @@ TEXT = {
         'final_q3': "Q3. Was the operation easy?",
         'final_q4': "Q4. Comments / Feedback",
         'btn_download': "💾 Download Data (CSV)",
+        'btn_confirm': "Confirm Answers",
         'btn_end': "🔄 Finish & Reset (Back to Top)",
         'warning_line': "⚠️ Important: For LINE/Instagram users",
         'info_line': "Please open in standard browser (Safari/Chrome) to ensure data saving.",
@@ -598,6 +600,7 @@ def main():
 
         st.markdown("---")
         
+        #最終アンケート
         with st.form("final_survey"):
             opts = T['likert_opts']
             q1 = st.select_slider(T['final_q1'], options=opts, value=opts[2])
@@ -605,9 +608,9 @@ def main():
             q3 = st.select_slider(T['final_q3'], options=opts, value=opts[2])
             comment = st.text_area(T['final_q4'])
             
-            final_submit = st.form_submit_button(T['btn_download'])
+            confirm_submit = st.form_submit_button(T['btn_confirm'], type="primary")
 
-        if final_submit:
+        if confirm_submit:
             if st.session_state.all_results:
                 for res in st.session_state.all_results:
                     res["final_q1"] = q1
@@ -615,15 +618,29 @@ def main():
                     res["final_q3"] = q3
                     res["final_comment"] = comment
                     res["total_score"] = total_score
+                
+                # フラグを立てる
+                st.session_state.survey_completed = True
+                st.rerun() # リロードしてダウンロードボタンを表示させる
 
-                df = pd.DataFrame(st.session_state.all_results)
-                csv = df.to_csv(index=False).encode('utf-8')
-                filename = f"{st.session_state.user_name}_FULL_EXPERIMENT.csv"
+        # --- フラグが立っていたらダウンロードボタンを表示 ---
+        if st.session_state.survey_completed:
+            df = pd.DataFrame(st.session_state.all_results)
+            csv = df.to_csv(index=False).encode('utf-8')
+            filename = f"{st.session_state.user_name}_FULL_EXPERIMENT.csv"
 
-                st.success("Ready to download!")
-                st.download_button(T['btn_download'], data=csv, file_name=filename, mime='text/csv', type='primary')
+            st.success("Thank you! Data is ready.")
+            # 👇 ここに本当のダウンロードボタンを表示
+            st.download_button(
+                label=T['btn_download'], 
+                data=csv, 
+                file_name=filename, 
+                mime='text/csv', 
+                type='primary'
+            )
 
         st.markdown("---")
+        
         if st.button(T['btn_end']):
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
