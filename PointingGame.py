@@ -45,6 +45,11 @@ TEXT = {
         'btn_decide': "決定する",
         'result_score': "スコア",
         'result_match': "AIとの一致度",
+        'res_total': "合計スコア",
+        'res_avg_score': "平均スコア",
+        'res_avg_time': "平均回答時間",
+        'chart_label': "画像番号",
+        'likert_opts': ["1.全くそう思わない", "2.あまりそう思わない", "3.どちらとも言えない", "4.そう思う", "5.強くそう思う"],
         'ai_pred': "AI予測",
         'ai_breakdown': "AIの判断内訳",
         'playing_title': "🧪 実験プレイ中 (本番)",
@@ -95,6 +100,11 @@ TEXT = {
         'btn_decide': "Submit",
         'result_score': "Score",
         'result_match': "Match Rate",
+        'res_total': "Total Score",
+        'res_avg_score': "Avg Score",
+        'res_avg_time': "Avg Time",
+        'chart_label': "Image ID",
+        'likert_opts': ["1.Strongly Disagree", "2.Disagree", "3.Neutral", "4.Agree", "5.Strongly Agree"],
         'ai_pred': "AI Prediction",
         'ai_breakdown': "AI Prediction Breakdown",
         'playing_title': "🧪 Main Experiment",
@@ -566,16 +576,23 @@ def main():
                         <p style="font-size: 0.9em; color: gray; margin: 0;">Avg Score</p>
                         <p style="font-size: 1.8em; font-weight: bold; margin: 0; color: #1f77b4;">{avg_score:.1f}</p>
                     </div>
+                    <div>
+                        <p style="font-size: 0.9em; color: gray; margin: 0;">{T['res_avg_time']}</p>
+                        <p style="font-size: 1.8em; font-weight: bold; margin: 0; color: #31333F;">{avg_time:.1f}s</p>
+                    </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
 
             st.write(T['chart_title'])
+
+            chart_col_name = T['chart_label']
             chart_data = pd.DataFrame({
-                'Image No.': range(1, len(scores) + 1),
+                chart_col_name: range(1, len(scores) + 1),
                 'Score': scores
             })
-            st.bar_chart(chart_data.set_index('Image No.'), color="#FF4B4B")
+            # set_indexを使って明示的にx軸を指定
+            st.bar_chart(chart_data.set_index(chart_col_name), color="#FF4B4B")
 
         else:
             total_score = 0
@@ -583,10 +600,10 @@ def main():
         st.markdown("---")
         
         with st.form("final_survey"):
-            likert = ["1", "2", "3", "4", "5"]
-            q1 = st.select_slider(T['final_q1'], options=likert, value="3")
-            q2 = st.select_slider(T['final_q2'], options=likert, value="3")
-            q3 = st.select_slider(T['final_q3'], options=likert, value="3")
+            opts = T['likert_opts']
+            q1 = st.select_slider(T['final_q1'], options=opts, value="3")
+            q2 = st.select_slider(T['final_q2'], options=opts, value="3")
+            q3 = st.select_slider(T['final_q3'], options=opts, value="3")
             comment = st.text_area(T['final_q4'])
             
             final_submit = st.form_submit_button(T['btn_download'])
