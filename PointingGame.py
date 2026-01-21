@@ -301,6 +301,9 @@ def main():
         # ⚠️ 警告はここに移動
         st.warning(T['warning_line'])
         st.info(T['info_line'])
+
+        if st.session_state.language == 'ja':
+             st.info("🌐 For English Speakers: Please click the '>>' arrow at the top left to open the sidebar and switch the Language.")
         
         st.title(T['title'])
         st.markdown(T['welcome_desc'])
