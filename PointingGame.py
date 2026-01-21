@@ -123,9 +123,11 @@ def generate_result_image(original_img_pil, heatmap_np, user_point, true_point):
     superimposed_img = cv2.addWeighted(img_cv, 0.6, colormap, 0.4, 0)
     
     cv2.circle(superimposed_img, user_point, 5, (255, 0, 0), -1) 
+    cv2.circle(superimposed_img, user_point, 25, (255, 0, 0), 1)
     cv2.putText(superimposed_img, "YOU", (user_point[0]+8, user_point[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
     cv2.circle(superimposed_img, true_point, 5, (0, 0, 255), -1)
+    cv2.circle(superimposed_img, true_point, 25, (255, 0, 0), 1)
     cv2.putText(superimposed_img, "AI", (true_point[0]+8, true_point[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
     return Image.fromarray(cv2.cvtColor(superimposed_img, cv2.COLOR_BGR2RGB))
@@ -135,9 +137,9 @@ def generate_result_image(original_img_pil, heatmap_np, user_point, true_point):
 def main():
     st.set_page_config(page_title="Grad-CAM Experiment", layout="centered")
 
-    st.warning("⚠️ **重要：LINEやInstagramから開いている方へ**")
+    st.warning("⚠️ 重要：LINEやInstagramから開いている方へ")
     st.info("""
-    このアプリは**LINEなどのアプリ内ブラウザでは、最後のデータ保存ができない**場合があります。
+    このアプリはLINEなどのアプリ内ブラウザでは、最後のデータ保存ができない場合があります。
     
     お手数をおかけしますが、画面右上のメニュー（︙ または 共有アイコン）から 「ブラウザで開く (Safari / Chrome)」等を選択して、標準ブラウザで開き直してから実験を開始してください。
     """)
@@ -163,12 +165,12 @@ def main():
     if st.session_state.game_state == 'welcome':
         st.title("🧪 Grad-CAM ポイント当て実験")
         st.markdown("""
-        この実験は、**「AI（人工知能）が画像のどこを見て判断したか」**を人間がどれくらい予測できるか調査するものです。
+        この実験は、「AI（人工知能）が画像のどこを見て判断したか」を人間がどれくらい予測できるか調査するものです。
         
-        **実験の流れ:**
-        1. **練習モード:** 最初に1枚だけ練習を行います。
-        2. **本番:** 本番の画像で実験を行います。
-        3. **アンケート:** 画像ごと、および最後にアンケートがあります。
+        実験の流れ:
+        1. 練習モード: 最初に1枚だけ練習を行います。
+        2. 本番: 本番の画像で実験を行います。
+        3. アンケート: 画像ごと、および最後にアンケートがあります。
         """)
         
         st.markdown("---")
@@ -396,7 +398,7 @@ def main():
 
         st.markdown("---")
         st.subheader("📝 画像ごとのアンケート")
-        st.info("以下のアンケートに回答し、**「確定して次へ」**を押してください。")
+        st.info("以下のアンケートに回答し、「確定して次へ」を押してください。")
 
         
         q_difficulty = st.select_slider(
@@ -419,10 +421,10 @@ def main():
     
         if q_agree == "納得できない":
             reason_options = [
-                "背景や関係ない場所を見ている",
-                "重要な箇所（顔など）を見ていない",
+                "物体外の背景を示している",
+                "物体内の意図しない部分を示している",
                 "注目範囲が広すぎる/ぼやけている",
-                "全く違う物体を見ている",
+                "認識対象の物体が間違っている",
                 "その他"
             ]
             # 理由を選択させる
@@ -486,7 +488,7 @@ def main():
                 player_type = "🤖 AIシンクロナイザー（AI同調型）"
                 type_desc = "AIの思考回路を完全に理解しています。あなたのデータは「AIの正解基準」として非常に価値があります。"
                 icon = "👑"
-            elif avg_score >= 60 and avg_time < 3.0:
+            elif avg_score >= 60 and avg_time < 5.0:
                 player_type = "⚡ スピード・アナリスト（直感型）"
                 type_desc = "迷いのない直感的な判断力を持っています。AIが人間をどう認識するかという研究に貢献します。"
                 icon = "🚀"
@@ -617,33 +619,13 @@ def main():
         st.markdown("---")
         st.info("保存が完了したらブラウザを閉じてください。別の被験者で開始する場合はサイドバーの「実験をリセット」を押してください。")
 
+        st.markdown("---")
+        st.write("終了またはリセットする場合：")
+        # 指摘対応: 保存せずに終了するボタン
+        if st.button("🔄 実験を終了してリセット (トップへ戻る)"):
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            st.rerun()
+
 if __name__ == "__main__":
     main()
-
-if __name__ == "__main__":
-    # バージョン確認のために必要なライブラリをインポート
-    import streamlit as st
-    import tensorflow as tf
-    import pandas as pd
-    import numpy as np
-    import cv2
-    import googletrans
-    from importlib.metadata import version, PackageNotFoundError # 👈 これを使います
-
-    # Image Coordinatesのバージョンを安全に取得
-    try:
-        coord_ver = version("streamlit-image-coordinates")
-    except PackageNotFoundError:
-        coord_ver = "不明"
-
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📚 開発環境バージョン")
-    st.sidebar.code(f"""
-    Streamlit: {st.__version__}
-    TensorFlow: {tf.__version__}
-    NumPy: {np.__version__}
-    OpenCV: {cv2.__version__}
-    Pandas: {pd.__version__}
-    Googletrans: {googletrans.__version__}
-    Image Coordinates: {coord_ver}
-    """)
