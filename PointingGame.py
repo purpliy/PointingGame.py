@@ -136,14 +136,6 @@ def generate_result_image(original_img_pil, heatmap_np, user_point, true_point):
 def main():
     st.set_page_config(page_title="Grad-CAM Experiment", layout="centered")
 
-    st.warning("⚠️ 重要：LINEやInstagramから開いている方へ")
-    st.info("""
-    このアプリはLINEなどのアプリ内ブラウザでは、最後のデータ保存ができない場合があります。
-    
-    お手数をおかけしますが、画面右上のメニュー（︙ または 共有アイコン）から 「ブラウザで開く (Safari / Chrome)」等を選択して、標準ブラウザで開き直してから実験を開始してください。
-    """)
-    st.markdown("---")
-    
     with st.sidebar:
         st.write("🔧 管理者メニュー")
         if st.button("実験をリセット (最初に戻る)"):
@@ -162,6 +154,14 @@ def main():
 
     # --- WELCOME ---
     if st.session_state.game_state == 'welcome':
+        st.warning("⚠️ 重要：LINEやInstagramから開いている方へ")
+        st.info("""
+        このアプリはLINEなどのアプリ内ブラウザでは、最後のデータ保存ができない場合があります。
+        
+        お手数をおかけしますが、画面右上のメニュー（︙ または 共有アイコン）から 「ブラウザで開く (Safari / Chrome)」等を選択して、標準ブラウザで開き直してから実験を開始してください。
+        """)
+        st.markdown("---")
+        
         st.title("🧪 Grad-CAM ポイント当て実験")
         st.markdown("""
         この実験は、「AI（人工知能）が画像のどこを見て判断したか」を人間がどれくらい予測できるか調査するものです。
