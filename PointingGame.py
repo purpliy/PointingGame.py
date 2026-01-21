@@ -601,9 +601,9 @@ def main():
         
         with st.form("final_survey"):
             opts = T['likert_opts']
-            q1 = st.select_slider(T['final_q1'], options=opts, value="3")
-            q2 = st.select_slider(T['final_q2'], options=opts, value="3")
-            q3 = st.select_slider(T['final_q3'], options=opts, value="3")
+            q1 = st.select_slider(T['final_q1'], options=opts, value=opts[2])
+            q2 = st.select_slider(T['final_q2'], options=opts, value=opts[2])
+            q3 = st.select_slider(T['final_q3'], options=opts, value=opts[2])
             comment = st.text_area(T['final_q4'])
             
             final_submit = st.form_submit_button(T['btn_download'])
