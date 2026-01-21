@@ -540,7 +540,6 @@ def main():
 
     # --- FINISHED ---
     elif st.session_state.game_state == 'finished':
-        st.balloons()
         st.title(T['finished_title'])
         
         if st.session_state.all_results:
