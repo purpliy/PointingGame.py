@@ -543,6 +543,9 @@ def main():
     # --- FINISHED ---
     elif st.session_state.game_state == 'finished':
         st.title(T['finished_title'])
+
+        if 'survey_completed' not in st.session_state:
+            st.session_state.survey_completed = False
         
         if st.session_state.all_results:
             scores = [res['score'] for res in st.session_state.all_results]
@@ -640,7 +643,7 @@ def main():
             )
 
         st.markdown("---")
-        
+
         if st.button(T['btn_end']):
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
