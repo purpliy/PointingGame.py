@@ -123,11 +123,9 @@ def generate_result_image(original_img_pil, heatmap_np, user_point, true_point):
     superimposed_img = cv2.addWeighted(img_cv, 0.6, colormap, 0.4, 0)
     
     cv2.circle(superimposed_img, user_point, 5, (255, 0, 0), -1) 
-    cv2.circle(superimposed_img, user_point, 25, (255, 0, 0), 1)
     cv2.putText(superimposed_img, "YOU", (user_point[0]+8, user_point[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
     cv2.circle(superimposed_img, true_point, 5, (0, 0, 255), -1)
-    cv2.circle(superimposed_img, true_point, 25, (255, 0, 0), 1)
     cv2.putText(superimposed_img, "AI", (true_point[0]+8, true_point[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
 
     return Image.fromarray(cv2.cvtColor(superimposed_img, cv2.COLOR_BGR2RGB))
@@ -420,24 +418,10 @@ def main():
         final_reason = "" # デフォルトは空欄
     
         if q_agree == "納得できない":
-            reason_options = [
-                "物体外の背景を示している",
-                "物体内の意図しない部分を示している",
-                "注目範囲が広すぎる/ぼやけている",
-                "認識対象の物体が間違っている",
-                "その他"
-            ]
-            # 理由を選択させる
-            q_disagree_selection = st.selectbox(
-                "Q2-1. 納得できない主な理由を教えてください",
-                reason_options
+            final_reason = st.text_input(
+                "Q2-1. 納得できない理由を教えてください（自由記述）",
+                placeholder="例: 何もない背景を見ている、顔ではなく手を見ている、など"
             )
-            
-            if q_disagree_selection == "その他":
-                q_free_text = st.text_input("具体的な理由を自由に入力してください", placeholder="例: AIの注目点が複数に分かれているのがおかしい、など")
-                final_reason = f"その他: {q_free_text}" if q_free_text else "その他（記述なし）"
-            else:
-                final_reason = q_disagree_selection
 
         st.markdown("<br>", unsafe_allow_html=True) # 少し余白
 
