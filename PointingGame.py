@@ -122,7 +122,8 @@ def generate_result_image(original_img_pil, heatmap_np, user_point, true_point):
     
     superimposed_img = cv2.addWeighted(img_cv, 0.6, colormap, 0.4, 0)
     
-    cv2.circle(superimposed_img, user_point, 5, (255, 0, 0), -1) 
+    cv2.circle(superimposed_img, user_point, 5, (255, 0, 0), -1)
+    cv2.circle(superimposed_img, user_point, 25, (255, 0, 0), 1)
     cv2.putText(superimposed_img, "YOU", (user_point[0]+8, user_point[1]), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
 
     cv2.circle(superimposed_img, true_point, 5, (0, 0, 255), -1)
