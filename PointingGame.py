@@ -13,7 +13,7 @@ import time
 from streamlit_image_coordinates import streamlit_image_coordinates
 from importlib.metadata import version, PackageNotFoundError
 import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
 
 # --- 1. 定数と初期設定 ---
 
@@ -147,26 +147,39 @@ TEXT = {
 def save_to_google_sheets(df):
     """
     データフレームをGoogleスプレッドシートに追記する関数
+    (google-auth使用 / 一括書き込み対応版)
     """
     try:
-        # Secretsから認証情報を取得
-        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        # st.secrets["gcp_service_account"] は辞書として取得できる
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
+        # 認証スコープ設定
+        scopes = [
+            'https://www.googleapis.com/auth/spreadsheets',
+            'https://www.googleapis.com/auth/drive'
+        ]
+        
+        # Secretsから認証情報を取得 (google-auth形式)
+        # st.secrets["gcp_service_account"] は辞書としてそのまま渡せます
+        creds = Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=scopes
+        )
         client = gspread.authorize(creds)
 
         # スプレッドシートを開く
         sheet = client.open(SHEET_NAME).sheet1
 
-        # データがあればヘッダーチェック
-        if len(sheet.get_all_values()) == 0:
-            # ヘッダー書き込み
-            sheet.append_row(df.columns.tolist())
+        # データ書き込み準備
+        # ヘッダーが必要か確認 (シートが空ならヘッダーも書き込む)
+        existing_data = sheet.get_all_values()
+        to_append = []
         
-        # データ書き込み (各行を追加)
-        data_list = df.astype(str).values.tolist()
-        for row in data_list:
-            sheet.append_row(row)
+        if len(existing_data) == 0:
+            to_append.append(df.columns.tolist())
+        
+        # データの中身をリスト化
+        to_append.extend(df.astype(str).values.tolist())
+        
+        # 一括書き込み (append_rows) を使用して高速化・安定化
+        sheet.append_rows(to_append)
             
         return True, None
     except Exception as e:
