@@ -179,7 +179,7 @@ def save_to_google_sheets(df):
         to_append.extend(df.astype(str).values.tolist())
         
         # 一括書き込み (append_rows) を使用して高速化・安定化
-        sheet.append_rows(to_append)
+        sheet.append_rows(to_append, table_range="A1")
             
         return True, None
     except Exception as e:
