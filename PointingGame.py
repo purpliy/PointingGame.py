@@ -12,6 +12,8 @@ import random
 import time
 from streamlit_image_coordinates import streamlit_image_coordinates
 from importlib.metadata import version, PackageNotFoundError
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 # --- 1. 定数と初期設定 ---
 
@@ -19,6 +21,8 @@ IMG_SIZE = (224, 224)
 LAST_CONV_LAYER_NAME = "out_relu"
 IMAGE_FOLDER = "images"
 EXAMPLE_IMAGE_PATH = "practice.jpg"
+SHEET_NAME = "pointinggame"
+
 
 # --- 2. 言語辞書 (日本語 / English) ---
 TEXT = {
@@ -66,7 +70,9 @@ TEXT = {
         'final_q3': "Q3. 操作は分かりやすかったですか？",
         'final_q4': "Q4. 自由記述（感想や気づき）",
         'btn_download': "💾 実験データをダウンロード (CSV)",
-        'btn_confirm': "回答を確定する",
+        'btn_confirm': "回答を確定して送信する",
+        'save_success': "✅ データがクラウドに保存されました！ご協力ありがとうございました。",
+        'save_error': "⚠️ クラウド保存に失敗しました。下のCSVダウンロードを使って送信してください。",
         'btn_end': "🔄 実験を終了してリセット (トップへ戻る)",
         'warning_line': "⚠️ 重要：LINEやInstagramから開いている方へ",
         'info_line': "データの保存ができない場合があるため、右上のメニューから「ブラウザで開く (Safari/Chrome)」を選択してください。",
@@ -122,7 +128,9 @@ TEXT = {
         'final_q3': "Q3. Was the operation easy?",
         'final_q4': "Q4. Comments / Feedback",
         'btn_download': "💾 Download Data (CSV)",
-        'btn_confirm': "Confirm Answers",
+        'btn_confirm': "Confirm & Submit to Cloud",
+        'save_success': "✅ Data saved to cloud successfully! Thank you.",
+        'save_error': "⚠️ Cloud save failed. Please download CSV below and send it.",
         'btn_end': "🔄 Finish & Reset (Back to Top)",
         'warning_line': "⚠️ Important: For LINE/Instagram users",
         'info_line': "Please open in standard browser (Safari/Chrome) to ensure data saving.",
@@ -135,6 +143,34 @@ TEXT = {
         )
     }
 }
+
+def save_to_google_sheets(df):
+    """
+    データフレームをGoogleスプレッドシートに追記する関数
+    """
+    try:
+        # Secretsから認証情報を取得
+        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+        # st.secrets["gcp_service_account"] は辞書として取得できる
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(dict(st.secrets["gcp_service_account"]), scope)
+        client = gspread.authorize(creds)
+
+        # スプレッドシートを開く
+        sheet = client.open(SHEET_NAME).sheet1
+
+        # データがあればヘッダーチェック
+        if len(sheet.get_all_values()) == 0:
+            # ヘッダー書き込み
+            sheet.append_row(df.columns.tolist())
+        
+        # データ書き込み (各行を追加)
+        data_list = df.astype(str).values.tolist()
+        for row in data_list:
+            sheet.append_row(row)
+            
+        return True, None
+    except Exception as e:
+        return False, str(e)
 
 # --- 3. モデルとGrad-CAM計算 ---
 
@@ -549,6 +585,7 @@ def main():
 
         if 'survey_completed' not in st.session_state:
             st.session_state.survey_completed = False
+            st.session_state.save_status = None
         
         if st.session_state.all_results:
             scores = [res['score'] for res in st.session_state.all_results]
@@ -592,7 +629,6 @@ def main():
             """, unsafe_allow_html=True)
 
             st.write(T['chart_title'])
-
             chart_col_name = T['chart_label']
             chart_data = pd.DataFrame({
                 chart_col_name: range(1, len(scores) + 1),
@@ -625,24 +661,33 @@ def main():
                     res["final_comment"] = comment
                     res["total_score"] = total_score
                 
-                # フラグを立てる
+                # DataFrame化してクラウド保存を実行
+                df = pd.DataFrame(st.session_state.all_results)
+                success, error_msg = save_to_google_sheets(df)
+                
+                st.session_state.save_status = (success, error_msg)
                 st.session_state.survey_completed = True
-                st.rerun() # リロードしてダウンロードボタンを表示させる
+                st.rerun()
 
-        # --- フラグが立っていたらダウンロードボタンを表示 ---
+        # --- 保存後の表示 (成功/失敗メッセージ + バックアップ用DLボタン) ---
         if st.session_state.survey_completed:
+            success, error_msg = st.session_state.save_status
+            
+            if success:
+                st.success(T['save_success'])
+            else:
+                st.error(f"{T['save_error']} (Error: {error_msg})")
+            
+            # バックアップ用ダウンロードボタン
             df = pd.DataFrame(st.session_state.all_results)
             csv = df.to_csv(index=False).encode('utf-8')
             filename = f"{st.session_state.user_name}_FULL_EXPERIMENT.csv"
 
-            st.success("Thank you! Data is ready.")
-            # 👇 ここに本当のダウンロードボタンを表示
             st.download_button(
                 label=T['btn_download'], 
                 data=csv, 
                 file_name=filename, 
-                mime='text/csv', 
-                type='primary'
+                mime='text/csv'
             )
 
         st.markdown("---")
